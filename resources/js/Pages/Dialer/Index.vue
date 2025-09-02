@@ -43,13 +43,14 @@
                                         <div>isCallActive: {{ isCallActive }}</div>
                                         <div>callDirection: {{ callDirection }}</div>
                                         <div>callStatus: {{ callStatus }}</div>
-                                        <div>Show Buttons: {{ isIncomingCall && isRinging && !isCallActive }}</div>
+                                        <div>Show Ringing Buttons: {{ callStatus === 'ringing' && isIncomingCall }}</div>
+                                        <div>Show Active Buttons: {{ callStatus === 'active' }}</div>
                                     </div>
                                 </div>
-                                    <div v-if="isCallActive || isRinging" class="space-y-4">
+                                    <!-- Ringing State - Show only Answer and Decline buttons -->
+                                    <div v-if="callStatus === 'ringing' && isIncomingCall" class="space-y-4">
                                         <!-- Answer Call Button (for incoming calls only) -->
-                                        <button v-if="isIncomingCall && isRinging && !isCallActive" 
-                                                @click="answerCall" 
+                                        <button @click="answerCall" 
                                                 class="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-200">
                                             <div class="flex items-center justify-center space-x-2">
                                                 <span class="text-xl">📞</span>
@@ -57,56 +58,58 @@
                                             </div>
                                         </button>
                                         
-                                        <!-- Reject Call Button (for incoming calls only) -->
-                                        <button v-if="isIncomingCall && isRinging && !isCallActive" 
-                                                @click="rejectCall" 
+                                        <!-- Decline Call Button (for incoming calls only) -->
+                                        <button @click="rejectCall" 
                                                 class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
                                             <div class="flex items-center justify-center space-x-2">
                                                 <span class="text-xl">❌</span>
-                                                <span>Reject Call</span>
+                                                <span>Decline Call</span>
                                             </div>
                                         </button>
-                                    
-                                    <!-- Mute Button -->
-                                    <button @click="toggleMute" 
-                                            :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
-                                                isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'
-                                            }`">
-                                        <div class="flex items-center justify-center space-x-2">
-                                            <span class="text-xl">{{ isMuted ? '🔇' : '🎤' }}</span>
-                                            <span>{{ isMuted ? 'Unmute' : 'Mute' }}</span>
-                                        </div>
-                                    </button>
+                                    </div>
 
-                                    <!-- Hold Button -->
-                                    <button @click="toggleHold" 
-                                            :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
-                                                isOnHold ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'
-                                            }`">
-                                        <div class="flex items-center justify-center space-x-2">
-                                            <span class="text-xl">{{ isOnHold ? '⏸️' : '⏸️' }}</span>
-                                            <span>{{ isOnHold ? 'Resume' : 'Hold' }}</span>
-                                        </div>
-                                    </button>
+                                    <!-- Active Call State - Show call control buttons -->
+                                    <div v-if="callStatus === 'active'" class="space-y-4">
+                                        <!-- Mute Button -->
+                                        <button @click="toggleMute" 
+                                                :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
+                                                    isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'
+                                                }`">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-xl">{{ isMuted ? '🔇' : '🎤' }}</span>
+                                                <span>{{ isMuted ? 'Unmute' : 'Mute' }}</span>
+                                            </div>
+                                        </button>
 
-                                    <!-- Hangup Button -->
-                                    <button @click="endCall" 
-                                            class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
-                                        <div class="flex items-center justify-center space-x-2">
-                                            <span class="text-xl">📴</span>
-                                            <span>End Call</span>
-                                        </div>
-                                    </button>
+                                        <!-- Hold Button -->
+                                        <button @click="toggleHold" 
+                                                :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
+                                                    isOnHold ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'
+                                                }`">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-xl">{{ isOnHold ? '⏸️' : '⏸️' }}</span>
+                                                <span>{{ isOnHold ? 'Resume' : 'Hold' }}</span>
+                                            </div>
+                                        </button>
 
-                                    <!-- Disconnect Button -->
-                                    <button @click="disconnectCall" 
-                                            class="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-all duration-200">
-                                        <div class="flex items-center justify-center space-x-2">
-                                            <span class="text-xl">🔌</span>
-                                            <span>Disconnect</span>
-                                        </div>
-                                    </button>
-                                </div>
+                                        <!-- Hangup Button -->
+                                        <button @click="endCall" 
+                                                class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-xl">📴</span>
+                                                <span>End Call</span>
+                                            </div>
+                                        </button>
+
+                                        <!-- Disconnect Button -->
+                                        <button @click="disconnectCall" 
+                                                class="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-xl">🔌</span>
+                                                <span>Disconnect</span>
+                                            </div>
+                                        </button>
+                                    </div>
 
                                 <!-- Connection Status -->
                                 <div class="bg-gray-50 rounded-lg p-4">
