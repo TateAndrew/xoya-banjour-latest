@@ -30,13 +30,25 @@
                                         {{ callStatusIcon }}
                                     </div>
                                     <h3 class="text-lg font-semibold text-gray-900">{{ callStatusText }}</h3>
+                                    <p v-if="callDirection" class="text-sm text-gray-600 mb-2">
+                                        {{ callDirection === 'incoming' ? '📞 Incoming Call' : '📞 Outgoing Call' }}
+                                    </p>
                                     <p v-if="callDuration" class="text-2xl font-mono text-blue-600">{{ callDuration }}</p>
+                                    
+                                    <!-- Debug Information -->
+                                    <div class="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-left">
+                                        <div class="font-semibold text-yellow-800 mb-1">Debug Info:</div>
+                                        <div>isIncomingCall: {{ isIncomingCall }}</div>
+                                        <div>isRinging: {{ isRinging }}</div>
+                                        <div>isCallActive: {{ isCallActive }}</div>
+                                        <div>callDirection: {{ callDirection }}</div>
+                                        <div>callStatus: {{ callStatus }}</div>
+                                        <div>Show Buttons: {{ isIncomingCall && isRinging && !isCallActive }}</div>
+                                    </div>
                                 </div>
-
-                                                                    <!-- Call Controls -->
                                     <div v-if="isCallActive || isRinging" class="space-y-4">
-                                        <!-- Answer Call Button (for incoming calls) -->
-                                        <button v-if="isRinging && !isCallActive" 
+                                        <!-- Answer Call Button (for incoming calls only) -->
+                                        <button v-if="isIncomingCall && isRinging && !isCallActive" 
                                                 @click="answerCall" 
                                                 class="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-200">
                                             <div class="flex items-center justify-center space-x-2">
@@ -45,8 +57,8 @@
                                             </div>
                                         </button>
                                         
-                                        <!-- Reject Call Button (for incoming calls) -->
-                                        <button v-if="isRinging && !isCallActive" 
+                                        <!-- Reject Call Button (for incoming calls only) -->
+                                        <button v-if="isIncomingCall && isRinging && !isCallActive" 
                                                 @click="rejectCall" 
                                                 class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
                                             <div class="flex items-center justify-center space-x-2">
@@ -54,6 +66,7 @@
                                                 <span>Reject Call</span>
                                             </div>
                                         </button>
+                                    
                                     <!-- Mute Button -->
                                     <button @click="toggleMute" 
                                             :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
@@ -111,6 +124,18 @@
                                                 {{ backendStatus }}
                                             </span>
                                         </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-gray-600">Source:</span>
+                                            <span class="text-blue-600">
+                                                Database
+                                            </span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-gray-600">Connections:</span>
+                                            <span class="text-gray-900 font-medium">
+                                                {{ connections.length }}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -120,10 +145,13 @@
                                             class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                                         🔄 Refresh Connections
                                     </button>
-                                    <button @click="initializeWebRTC" 
-                                            class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                                        📞 Initialize WebRTC
+                                    
+                                    <!-- Debug: Test Incoming Call -->
+                                    <button @click="simulateIncomingCall" 
+                                            class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                                        🧪 Test Incoming Call
                                     </button>
+
                                 </div>
                             </div>
                         </div>
@@ -143,13 +171,19 @@
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">SIP Connection</label>
                                     <select v-model="selectedConnection" 
+                                            @change="onConnectionChange"
                                             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                         <option value="">Select SIP Connection</option>
                                         <option v-for="connection in connections" :key="connection.id" :value="connection.id">
                                             {{ connection.name }} ({{ connection.status }})
                                         </option>
                                     </select>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        SIP connections loaded from your database
+                                    </p>
                                 </div>
+
+
 
 
 
@@ -170,7 +204,7 @@
                                                     {{ props.user.email || 'user@example.com' }}
                                                 </p>
                                                 <p class="text-xs text-blue-600 mt-1">
-                                                    Available Phone Numbers: {{ props.phoneNumbers ? props.phoneNumbers.length : 0 }}
+                                                    Available SIP Connections: {{ connections.length }}
                                                 </p>
                                                 <p class="text-xs text-blue-500 mt-1">
                                                     Last updated: {{ lastPhoneNumbersRefresh.toLocaleTimeString() }}
@@ -180,9 +214,9 @@
                                                 </p>
                                             </div>
                                         </div>
-                                        <button @click="refreshPhoneNumbers" 
+                                        <button @click="loadConnections" 
                                                 class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-all duration-200"
-                                                title="Refresh phone numbers">
+                                                title="Refresh connections">
                                             🔄
                                         </button>
                                     </div>
@@ -191,23 +225,31 @@
                                 <!-- Phone Numbers -->
                                 <div class="space-y-4">
                                     <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">From Number (User Assignment)</label>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            From Number (SIP Connection Assignment)
+                                        </label>
                                         <select v-model="fromNumber" 
-                                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-                                            <option value="" disabled>Select your phone number</option>
-                                            <option v-for="phone in props.phoneNumbers" 
+                                                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                                                :disabled="!selectedConnection">
+                                            <option value="" disabled>
+                                                {{ selectedConnection ? 'Select phone number from connection' : 'Select connection first' }}
+                                            </option>
+                                            <option v-for="phone in connectionPhoneNumbers" 
                                                     :key="phone.id" 
                                                     :value="phone.phone_number"
                                                     class="py-2">
                                                 {{ phone.phone_number }} 
-                                                <span v-if="phone.label" class="text-gray-500">({{ phone.label }})</span>
+                                                <span v-if="phone.assignment_type" class="text-gray-500">({{ phone.assignment_type }})</span>
                                             </option>
                                         </select>
                                         <p class="text-xs text-gray-500 mt-1">
-                                            Select the phone number you want to use for outgoing calls
+                                            Phone numbers assigned to the selected SIP connection
                                         </p>
                                         <div v-if="fromNumber" class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
                                             ✅ Active: {{ fromNumber }}
+                                        </div>
+                                        <div v-if="!selectedConnection" class="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-700">
+                                            ⚠️ Please select a connection first
                                         </div>
                                     </div>
                                     <div>
@@ -216,7 +258,6 @@
                                             <input v-model="toNumber" 
                                                    type="tel" 
                                                    placeholder="+18004377950" 
-                                                   @keydown="handleKeydown"
                                                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                                             <button @click="clearToNumber" 
                                                     class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -385,61 +426,7 @@
                                     </div>
                                 </div>
 
-                                <!-- Debug Logs -->
-                                <div class="border-t border-gray-200 pt-4">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <h4 class="text-sm font-medium text-gray-900">Debug Logs</h4>
-                                        <div class="flex space-x-2">
-                                            <button @click="clearDebugLogs" 
-                                                    class="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-200">
-                                                Clear
-                                            </button>
-                                            <span class="text-xs text-gray-400">
-                                                {{ debugLogs.length }} logs
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="bg-gray-50 rounded-lg border border-gray-200 max-h-48 overflow-y-auto debug-logs">
-                                        <div v-if="debugLogs.length === 0" class="text-center text-gray-500 py-8">
-                                            <span class="text-lg block mb-2">📋</span>
-                                            <p class="text-sm">No debug logs yet</p>
-                                            <p class="text-xs text-gray-400">Start using the dialer to see logs</p>
-                                        </div>
-                                        <div v-else class="divide-y divide-gray-200">
-                                            <div v-for="log in debugLogs.slice(-8)" :key="log.id" 
-                                                 class="p-3 hover:bg-gray-100 transition-colors debug-log-entry">
-                                                <div class="flex items-start space-x-3">
-                                                    <!-- Status Icon -->
-                                                    <div class="flex-shrink-0 mt-0.5">
-                                                        <div v-if="log.type === 'success'" 
-                                                             class="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                        <div v-else-if="log.type === 'error'" 
-                                                             class="w-2 h-2 bg-red-500 rounded-full"></div>
-                                                        <div v-else-if="log.type === 'warning'" 
-                                                             class="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                                                        <div v-else 
-                                                             class="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                                    </div>
-                                                    
-                                                    <!-- Log Content -->
-                                                    <div class="flex-1 min-w-0">
-                                                        <div class="flex items-center justify-between">
-                                                            <span class="text-xs font-medium text-gray-900 capitalize">
-                                                                {{ log.type }}
-                                                            </span>
-                                                            <span class="text-xs text-gray-500 font-mono">
-                                                                {{ log.timestamp }}
-                                                            </span>
-                                                        </div>
-                                                        <div class="text-xs text-gray-700 mt-1 break-words">
-                                                            {{ log.message }}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -469,6 +456,8 @@ const emit = defineEmits(['refreshPhoneNumbers'])
 // Reactive data
 const connections = ref([])
 const selectedConnection = ref('')
+const selectedConnectionData = ref(null) // To store details of the selected connection
+const connectionPhoneNumbers = ref([]) // Phone numbers from selected connection
 const fromNumber = ref('+12037206619')
 const toNumber = ref('+18004377950')
 const lastPhoneNumbersRefresh = ref(new Date())
@@ -478,12 +467,14 @@ const callStatus = ref('')
 const backendStatus = ref('disconnected')
 const webrtcStatus = ref('disconnected')
 const lastError = ref('')
-const debugLogs = ref([])
+
 const callDuration = ref('00:00')
 const isRinging = ref(false)
 const isConnected = ref(false)
 const isMuted = ref(false)
 const isOnHold = ref(false)
+const isIncomingCall = ref(false) // Track if current call is incoming
+const callDirection = ref('') // 'incoming' or 'outgoing'
 const transcript = ref([])
 let callTimer = null
 let webrtcClient = null
@@ -534,19 +525,24 @@ const callStatusIcon = computed(() => {
 })
 
 const callStatusText = computed(() => {
-    if (isRinging.value && callStatus.value === 'trying') return 'Attempting Call...'
-    if (isRinging.value && callStatus.value === 'requesting') return 'Sending Request...'
-    if (isRinging.value && callStatus.value === 'answering') return 'Answering Call...'
-    if (isRinging.value && callStatus.value === 'early') return 'Early Media...'
+    const direction = callDirection.value
+    const directionPrefix = direction === 'incoming' ? 'Incoming' : direction === 'outgoing' ? 'Outgoing' : ''
+    
+    if (isRinging.value && callStatus.value === 'trying') return `${directionPrefix} Call - Attempting...`
+    if (isRinging.value && callStatus.value === 'requesting') return `${directionPrefix} Call - Sending Request...`
+    if (isRinging.value && callStatus.value === 'answering') return `${directionPrefix} Call - Answering...`
+    if (isRinging.value && callStatus.value === 'early') return `${directionPrefix} Call - Early Media...`
+    if (isRinging.value && direction === 'incoming') return 'Incoming Call - Ringing'
+    if (isRinging.value && direction === 'outgoing') return 'Outgoing Call - Ringing'
     if (isRinging.value) return 'Call Ringing...'
     if (callStatus.value === 'recovering') return 'Recovering Call...'
-    if (isConnected.value && isOnHold.value) return 'Call On Hold'
-    if (isConnected.value && callStatus.value === 'active') return 'Call Active'
-    if (callStatus.value === 'failed') return 'Call Failed'
+    if (isConnected.value && isOnHold.value) return `${directionPrefix} Call On Hold`
+    if (isConnected.value && callStatus.value === 'active') return `${directionPrefix} Call Active`
+    if (callStatus.value === 'failed') return `${directionPrefix} Call Failed`
     if (callStatus.value === 'busy') return 'Line Busy'
     if (callStatus.value === 'destroy') return 'Call Destroyed'
     if (callStatus.value === 'purge') return 'Call Purged'
-    if (callStatus.value === 'new') return 'New Call Created'
+    if (callStatus.value === 'new') return `${directionPrefix} Call Created`
     return 'Ready to Call'
 })
 
@@ -591,26 +587,22 @@ const safeStringify = (obj) => {
 // Dialpad functions
 const addDigit = (digit) => {
     toNumber.value += digit
-    addDebugLog(`Added digit: ${digit}`, 'info')
 }
 
 const addPlus = () => {
     if (!toNumber.value.startsWith('+')) {
         toNumber.value = '+' + toNumber.value
     }
-    addDebugLog('Added plus sign', 'info')
 }
 
 const backspace = () => {
     if (toNumber.value.length > 0) {
         toNumber.value = toNumber.value.slice(0, -1)
-        addDebugLog('Removed last digit', 'info')
     }
 }
 
 const clearToNumber = () => {
     toNumber.value = ''
-    addDebugLog('Cleared to number', 'info')
 }
 
 const handleKeydown = (event) => {
@@ -668,25 +660,6 @@ const showCallNotification = (title, message, type = 'info') => {
 }
 
 // Logging and transcript functions
-const addDebugLog = (message, type = 'info') => {
-    const timestamp = new Date().toLocaleTimeString()
-    const logEntry = { 
-        message, 
-        type, 
-        timestamp,
-        id: Date.now() + Math.random() // Unique ID for each log
-    }
-    debugLogs.value.push(logEntry)
-    
-    // Console logging with colors
-    const colors = {
-        info: 'color: #3B82F6',
-        success: 'color: #10B981', 
-        error: 'color: #EF4444',
-        warning: 'color: #F59E0B'
-    }
-    console.log(`%c[${timestamp}] ${type.toUpperCase()}: ${message}`, colors[type] || colors.info)
-}
 
 const addTranscriptEntry = (type, message) => {
     const timestamp = new Date().toLocaleTimeString()
@@ -695,19 +668,13 @@ const addTranscriptEntry = (type, message) => {
 
 const clearTranscript = () => {
     transcript.value = []
-    addDebugLog('Transcript cleared', 'info')
 }
 
-const clearDebugLogs = () => {
-    debugLogs.value = []
-    addDebugLog('Debug logs cleared', 'info')
-}
+
 
 // Load connections
 const loadConnections = async () => {
     try {
-        addDebugLog('Loading connections from backend...', 'info')
-
         const response = await axios.get('/api/telnyx/connections', {
             headers: {
                 'Content-Type': 'application/json',
@@ -718,21 +685,102 @@ const loadConnections = async () => {
         if (response.data.success) {
             connections.value = response.data.connections
             backendStatus.value = 'connected'
-            addDebugLog(`Loaded ${connections.value.length} connections`, 'success')
+            
+            // Reset selection
+            selectedConnection.value = ''
+            selectedConnectionData.value = null
+            connectionPhoneNumbers.value = []
+            fromNumber.value = ''
+            
+            // Auto-select the first connection by default
+            if (connections.value.length > 0) {
+                selectedConnection.value = connections.value[0].id
+                await onConnectionChange()
+            }
         } else {
             throw new Error(response.data.error || 'Failed to load connections')
         }
     } catch (error) {
-        addDebugLog(`Failed to load connections: ${error.message}`, 'error')
         lastError.value = error.message
         backendStatus.value = 'error'
     }
 }
 
+
+
+// Handle connection selection change
+const onConnectionChange = async () => {
+    if (selectedConnection.value) {
+        // Find the selected connection data
+        selectedConnectionData.value = connections.value.find(conn => conn.id == selectedConnection.value)
+        
+        if (selectedConnectionData.value) {
+            // Database connections have phone numbers
+            connectionPhoneNumbers.value = selectedConnectionData.value.phone_numbers || []
+            
+            // Auto-select the first phone number if available
+            if (connectionPhoneNumbers.value.length > 0) {
+                fromNumber.value = connectionPhoneNumbers.value[0].phone_number
+                addTranscriptEntry('System', `SIP connection changed to: ${selectedConnectionData.value.name}`)
+            } else {
+                fromNumber.value = ''
+                addTranscriptEntry('System', `SIP connection changed to: ${selectedConnectionData.value.name} - no phone numbers assigned`)
+            }
+            
+            // Automatically initialize WebRTC with the selected connection
+            addTranscriptEntry('System', 'Initializing WebRTC with selected connection...')
+            webrtcStatus.value = 'connecting'
+            await initializeWebRTC()
+        }
+    } else {
+        // Reset when no connection is selected
+        selectedConnectionData.value = null
+        connectionPhoneNumbers.value = []
+        fromNumber.value = ''
+        webrtcStatus.value = 'disconnected'
+        addTranscriptEntry('System', 'No connection selected')
+    }
+}
+
+// Get current connection credentials from database
+const getCurrentConnectionCredentials = () => {
+    if (!selectedConnectionData.value) {
+        return null
+    }
+    
+    const credentials = selectedConnectionData.value.credentials
+    
+    if (credentials && credentials.user_name && credentials.password) {
+        return {
+            login: credentials.user_name,
+            password: credentials.password
+        }
+    }
+    
+    // Check if credentials are stored directly on the connection object
+    if (selectedConnectionData.value.user_name && selectedConnectionData.value.password) {
+        return {
+            login: selectedConnectionData.value.user_name,
+            password: selectedConnectionData.value.password
+        }
+    }
+    
+    return null
+}
+
 // Initialize WebRTC
 const initializeWebRTC = async () => {
     try {
-        addDebugLog('Initializing WebRTC client...', 'info')
+        // Disconnect existing client if any
+        if (webrtcClient) {
+            webrtcClient.disconnect()
+            webrtcClient = null
+        }
+
+        // Check if a connection is selected
+        if (!selectedConnection.value) {
+            throw new Error('Please select a SIP connection first')
+        }
 
         // Request notification permission
         if ('Notification' in window && Notification.permission === 'default') {
@@ -746,23 +794,29 @@ const initializeWebRTC = async () => {
             if (localAudio) {
                 localAudio.srcObject = localStream
             }
-            addDebugLog('Local audio stream obtained', 'success')
         } catch (mediaError) {
-            addDebugLog(`Failed to get local audio: ${mediaError.message}`, 'warning')
         }
 
         const telnyxModule = await import('@telnyx/webrtc')
         const TelnyxRTC = telnyxModule.default || telnyxModule.TelnyxRTC || telnyxModule
 
-        addDebugLog('TelnyxRTC loaded successfully', 'success')
 
+        // Get credentials from selected connection
+        const credentials = getCurrentConnectionCredentials()
+        if (!credentials) {
+            throw new Error('No valid credentials found for selected connection. Please ensure the SIP connection has login and password configured in the database.')
+        }
+        
+        
+        // Initialize WebRTC client according to Telnyx documentation
         webrtcClient = new TelnyxRTC({
-            login: 'TateAndrew1122',    
-            password: 'Toxic22211',
+            login: credentials.login,    
+            password: credentials.password,
             audio: true,
             video: false,
-            logLevel: 'debug'
+            debug: false // Disable debug mode for production
         })
+        addTranscriptEntry('System', `WebRTC initialized with SIP connection: ${selectedConnectionData.value.name}`)
 
         // Set remote audio element
         webrtcClient.remoteElement = 'remoteMedia'
@@ -770,20 +824,21 @@ const initializeWebRTC = async () => {
         // Event listeners
         webrtcClient.on('telnyx.ready', () => {
             webrtcStatus.value = 'ready'
-            addDebugLog('WebRTC client ready', 'success')
-            addTranscriptEntry('System', 'WebRTC client initialized and ready')
+            addTranscriptEntry('System', 'WebRTC client initialized and ready for calls')
+            console.log('WebRTC client ready, can now receive incoming calls')
         })
 
         webrtcClient.on('telnyx.error', (error) => {
-            addDebugLog(`WebRTC error: ${error.message}`, 'error')
             lastError.value = error.message
             webrtcStatus.value = 'error'
             addTranscriptEntry('Error', `WebRTC error: ${error.message}`)
+            console.error('WebRTC error:', error)
         })
 
         webrtcClient.on('telnyx.notification', (notification) => {
-            console.log("Notification OBJECT HERE " , notification);
-            // addDebugLog(`WebRTC notification: ${safeStringify(notification)}`, 'info')
+            console.log('Telnyx notification received:', notification)
+            
+            // Handle WebRTC notifications according to Telnyx documentation
             
             if (notification.type === 'callUpdate') {
                 handleCallUpdate(notification.call)
@@ -791,26 +846,30 @@ const initializeWebRTC = async () => {
             
             // Handle call recovery
             if (notification.type === 'callRecovery' && notification.call) {
-                addDebugLog('Call recovery detected', 'warning')
                 addTranscriptEntry('System', 'Call recovery in progress...')
                 handleCallUpdate(notification.call)
             }
             
-            // Handle incoming calls
-            if (notification.type === 'incomingCall') {
-                deb
-                addDebugLog('Incoming call detected', 'info')
-                addTranscriptEntry('System', 'Incoming call received')
-                showCallNotification('📞 Incoming Call', 'You have an incoming call', 'info')
+            // Handle incoming calls - this is the key event for receiving calls
+            if (notification.type === 'incomingCall' && notification.call) {
+                const callerNumber = notification.call.params?.caller_id_number || 'Unknown'
+                addTranscriptEntry('System', `Incoming call notification received from ${callerNumber}`)
+                showCallNotification('📞 Incoming Call', `Incoming call from ${callerNumber}`, 'info')
+                handleIncomingCall(notification.call)
+            }
+            
+            // Handle other notification types that might indicate incoming calls
+            if (notification.type === 'call' && notification.call && notification.call.direction === 'inbound') {
+                const callerNumber = notification.call.params?.caller_id_number || 'Unknown'
+                addTranscriptEntry('System', `Inbound call detected from ${callerNumber}`)
+                showCallNotification('📞 Inbound Call', `Call from ${callerNumber}`, 'info')
                 handleIncomingCall(notification.call)
             }
         })
 
         await webrtcClient.connect()
-        addDebugLog('WebRTC client started', 'success')
 
     } catch (error) {
-        addDebugLog(`Failed to initialize WebRTC: ${error.message}`, 'error')
         lastError.value = error.message
         webrtcStatus.value = 'error'
     }
@@ -819,37 +878,56 @@ const initializeWebRTC = async () => {
 // Handle incoming calls
 const handleIncomingCall = (call) => {
     try {
+        console.log('🔔 handleIncomingCall called with:', call)
+        
         currentCall = call
         callStatus.value = 'ringing'
         isRinging.value = true
         isConnected.value = false
+        isIncomingCall.value = true // Mark as incoming call
+        callDirection.value = 'incoming'
         
-        addDebugLog('Incoming call handled', 'info')
-        addTranscriptEntry('Call', 'Incoming call received and handled')
+        console.log('📞 Incoming call state set:', {
+            isIncomingCall: isIncomingCall.value,
+            isRinging: isRinging.value,
+            isCallActive: isCallActive.value,
+            callDirection: callDirection.value,
+            shouldShowButtons: isIncomingCall.value && isRinging.value && !isCallActive.value
+        })
+        
+        // Extract caller information from the call object
+        if (call && call.params) {
+            if (call.params.caller_id_number) {
+                toNumber.value = call.params.caller_id_number // Set the caller's number as the "to" number for display
+            }
+            if (call.params.destination_number) {
+                fromNumber.value = call.params.destination_number // The number they called
+            }
+        }
+        
+        addTranscriptEntry('Call', `Incoming call received from ${toNumber.value || 'Unknown'}`)
+        addTranscriptEntry('Debug', `Call flags: incoming=${isIncomingCall.value}, ringing=${isRinging.value}, active=${isCallActive.value}`)
         
         // Set up call event listeners for incoming call
-        if (currentCall) {
+        if (currentCall && currentCall.on) {
             currentCall.on('stateChange', (state) => {
-                addDebugLog(`Incoming call state changed to: ${state}`, 'info')
-                callStatus.value = state
+                handleCallUpdate(currentCall)
             })
             
             currentCall.on('error', (error) => {
-                addDebugLog(`Incoming call error: ${error.message}`, 'error')
                 addTranscriptEntry('Error', `Incoming call error: ${error.message}`)
             })
         }
     } catch (error) {
-        addDebugLog(`Failed to handle incoming call: ${error.message}`, 'error')
+        console.error('❌ Error in handleIncomingCall:', error)
         addTranscriptEntry('Error', `Failed to handle incoming call: ${error.message}`)
     }
 }
 
 // Handle call updates
 const handleCallUpdate = (call) => {
-    addDebugLog(`Call state updated: ${call.state}`, 'info')
     callStatus.value = call.state
-    
+    debugger
     switch (call.state) {
         case 'new':
             addTranscriptEntry('Status', 'New call created')
@@ -916,7 +994,7 @@ const handleCallUpdate = (call) => {
             isConnected.value = false
             addTranscriptEntry('Status', 'Call ended')
             showCallNotification('📴 Call Ended', `Call with ${toNumber.value} ended`, 'error')
-            endCall()
+            endCall(true) // Skip hangup since call is already terminated
             break
             
         case 'destroy':
@@ -924,7 +1002,7 @@ const handleCallUpdate = (call) => {
             isConnected.value = false
             addTranscriptEntry('Status', 'Call has been destroyed')
             showCallNotification('🗑️ Call Destroyed', 'Call has been destroyed', 'error')
-            endCall()
+            endCall(true) // Skip hangup since call is already terminated
             break
             
         case 'purge':
@@ -932,7 +1010,7 @@ const handleCallUpdate = (call) => {
             isConnected.value = false
             addTranscriptEntry('Status', 'Call has been purged')
             showCallNotification('🧹 Call Purged', 'Call has been purged from system', 'error')
-            endCall()
+            endCall(true) // Skip hangup since call is already terminated
             break
             
         case 'failed':
@@ -940,6 +1018,7 @@ const handleCallUpdate = (call) => {
             isConnected.value = false
             addTranscriptEntry('Status', 'Call failed to connect')
             showCallNotification('❌ Call Failed', `Failed to connect to ${toNumber.value}`, 'error')
+            endCall(true) // Skip hangup since call failed
             break
             
         case 'busy':
@@ -947,13 +1026,38 @@ const handleCallUpdate = (call) => {
             isConnected.value = false
             addTranscriptEntry('Status', 'Line is busy')
             showCallNotification('🚫 Line Busy', `${toNumber.value} is busy`, 'warning')
+            endCall(true) // Skip hangup since line is busy
             break
             
-        default:
+        default:    
             addTranscriptEntry('Status', `Call state: ${call.state}`)
-            addDebugLog(`Unhandled call state: ${call.state}`, 'warning')
             break
     }
+}
+
+// Validate connection selection
+const validateConnectionSelection = () => {
+    if (!selectedConnection.value) {
+        throw new Error('Please select a SIP connection first')
+    }
+
+    if (!selectedConnectionData.value) {
+        throw new Error('Selected connection data not found')
+    }
+
+    if (!connectionPhoneNumbers.value || connectionPhoneNumbers.value.length === 0) {
+        throw new Error('Selected connection has no phone numbers assigned')
+    }
+
+    if (!fromNumber.value) {
+        throw new Error('Please select a phone number from the connection')
+    }
+
+    if (!toNumber.value) {
+        throw new Error('Please enter a destination number')
+    }
+
+    return true
 }
 
 // Start Call
@@ -963,44 +1067,43 @@ const startCall = async () => {
             throw new Error('WebRTC client not ready')
         }
 
-        if (!selectedConnection.value) {
-            throw new Error('Please select a SIP connection first')
-        }
+        // Validate connection selection
+        validateConnectionSelection()
 
         isConnecting.value = true
+        isIncomingCall.value = false // Mark as outgoing call
+        callDirection.value = 'outgoing'
         callStatus.value = 'Initializing call...'
-        addDebugLog(`Starting call from ${fromNumber.value} to ${toNumber.value}`, 'info')
-        addTranscriptEntry('Call', `Initiating call from ${fromNumber.value} to ${toNumber.value}`)
+        addTranscriptEntry('Call', `Initiating outgoing call from ${fromNumber.value} to ${toNumber.value}`)
+        addTranscriptEntry('System', `Using SIP connection: ${selectedConnectionData.value.name}`)
         
         const callDetail = {
             callerNumber: fromNumber.value,
             destinationNumber: toNumber.value,
-            connectionId: selectedConnection.value,
+            connectionId: selectedConnectionData.value.telnyx_connection_id || selectedConnection.value,
+            sipTrunkId: selectedConnection.value,
+            connectionName: selectedConnectionData.value.name,
+            connectionType: 'database',
         }
-
+        
         currentCall = webrtcClient.newCall(callDetail)
         
         // Set up call event listeners
         if (currentCall) {
             currentCall.on('stateChange', (state) => {
-                addDebugLog(`Call state changed to: ${state}`, 'info')
-                callStatus.value = state
+                handleCallUpdate(currentCall)
             })
             
             currentCall.on('error', (error) => {
-                addDebugLog(`Call error: ${error.message}`, 'error')
                 addTranscriptEntry('Error', `Call error: ${error.message}`)
             })
         }
         
-        addDebugLog('Call initiated successfully', 'success')
 
     } catch (error) {
-        addDebugLog(`Call failed: ${error.message}`, 'error')
         callStatus.value = 'Error: ' + error.message
-        lastError.value = error.message
         addTranscriptEntry('Error', `Call failed: ${error.message}`)
-    } finally {
+        showCallNotification('❌ Call Failed', error.message, 'error')
         isConnecting.value = false
     }
 }
@@ -1024,7 +1127,6 @@ const toggleMute = () => {
             }
         }
     } catch (error) {
-        addDebugLog(`Mute toggle failed: ${error.message}`, 'error')
     }
 }
 
@@ -1034,25 +1136,58 @@ const answerCall = () => {
             currentCall.answer()
             addTranscriptEntry('Control', 'Incoming call answered')
             showCallNotification('✅ Call Answered', 'Incoming call has been answered', 'success')
-            addDebugLog('Incoming call answered', 'success')
         } else {
-            addDebugLog('Answer method not available on current call', 'warning')
             addTranscriptEntry('Warning', 'Answer method not available')
         }
     } catch (error) {
-        addDebugLog(`Failed to answer call: ${error.message}`, 'error')
         addTranscriptEntry('Error', `Failed to answer call: ${error.message}`)
     }
 }
 
 const refreshPhoneNumbers = () => {
     try {
-        addDebugLog('Refreshing phone numbers...', 'info')
         lastPhoneNumbersRefresh.value = new Date()
         emit('refreshPhoneNumbers')
-        addDebugLog('Phone numbers refresh requested', 'success')
     } catch (error) {
-        addDebugLog(`Failed to refresh phone numbers: ${error.message}`, 'error')
+    }
+}
+
+// Debug function to simulate incoming call
+const simulateIncomingCall = () => {
+    try {
+        // Simulate incoming call data
+        const mockCall = {
+            params: {
+                caller_id_number: '+1234567890',
+                destination_number: fromNumber.value || '+12037206619'
+            },
+            state: 'ringing',
+            direction: 'inbound'
+        }
+        
+        addTranscriptEntry('Debug', 'Simulating incoming call for testing')
+        handleIncomingCall(mockCall)
+        
+        // Also simulate the current call for testing
+        currentCall = {
+            answer: () => {
+                addTranscriptEntry('Debug', 'Mock call answered')
+                callStatus.value = 'active'
+                isCallActive.value = true
+                isRinging.value = false
+            },
+            reject: () => {
+                addTranscriptEntry('Debug', 'Mock call rejected')
+                resetCallStates()
+            },
+            hangup: () => {
+                addTranscriptEntry('Debug', 'Mock call hung up')
+                resetCallStates()
+            }
+        }
+        
+    } catch (error) {
+        addTranscriptEntry('Error', `Failed to simulate incoming call: ${error.message}`)
     }
 }
 
@@ -1062,14 +1197,11 @@ const rejectCall = () => {
             currentCall.reject()
             addTranscriptEntry('Control', 'Incoming call rejected')
             showCallNotification('❌ Call Rejected', 'Incoming call has been rejected', 'info')
-            addDebugLog('Incoming call rejected', 'info')
             resetCallStates()
         } else {
-            addDebugLog('Reject method not available on current call', 'warning')
             addTranscriptEntry('Warning', 'Reject method not available')
         }
     } catch (error) {
-        addDebugLog(`Failed to reject call: ${error.message}`, 'error')
         addTranscriptEntry('Error', `Failed to reject call: ${error.message}`)
     }
 }
@@ -1114,41 +1246,47 @@ const toggleHold = () => {
             }
         }
         
-        addDebugLog(`Call ${isOnHold.value ? 'put on hold' : 'resumed from hold'}`, 'info')
     } catch (error) {
-        addDebugLog(`Hold toggle failed: ${error.message}`, 'error')
         addTranscriptEntry('Error', `Hold operation failed: ${error.message}`)
     }
 }
 
-const endCall = () => {
+const endCall = (skipHangup = false) => {
     try {
-        addDebugLog('Ending call...', 'info')
-        addTranscriptEntry('Control', 'Call ended by user')
-        showCallNotification('📴 Call Ended', 'Call terminated by user', 'info')
-
+        
         if (currentCall) {
-            currentCall.hangup()
+            // Only try to hangup if the call is not already in a terminated state
+            const terminatedStates = ['hangup', 'destroy', 'purge', 'failed', 'busy']
+            const currentState = callStatus.value
+            
+            if (!terminatedStates.includes(currentState)) {
+                addTranscriptEntry('Control', 'Call ended by user')
+                showCallNotification('📴 Call Ended', 'Call terminated by user', 'info')
+                currentCall.hangup()
+            } else {
+                addTranscriptEntry('System', 'Call already terminated by server')
+            }
             currentCall = null
         }
-
         if (callTimer) {
             clearInterval(callTimer)
             callTimer = null
         }
 
+        // Reset all call states
         isCallActive.value = false
         isRinging.value = false
         isConnected.value = false
         isOnHold.value = false
+        isIncomingCall.value = false
+        callDirection.value = ''
+        isConnecting.value = false
         callStatus.value = ''
         callDuration.value = '00:00'
-        addDebugLog('Call ended', 'success')
         
         // Reset call states for next call
         addTranscriptEntry('System', 'Call session ended, ready for next call')
     } catch (error) {
-        addDebugLog(`Call end error: ${error.message}`, 'error')
         lastError.value = error.message
     }
 }
@@ -1159,14 +1297,14 @@ const resetCallStates = () => {
     isRinging.value = false
     isConnected.value = false
     isOnHold.value = false
+    isIncomingCall.value = false
+    callDirection.value = ''
     callStatus.value = ''
     callDuration.value = '00:00'
-    addDebugLog('All call states reset', 'info')
 }
 
 const disconnectCall = () => {
     try {
-        addDebugLog('Disconnecting call...', 'info')
         addTranscriptEntry('Control', 'Call disconnected by user')
         showCallNotification('🔌 Call Disconnected', 'Call has been disconnected', 'info')
 
@@ -1176,10 +1314,8 @@ const disconnectCall = () => {
         }
 
         endCall()
-        addDebugLog('Call disconnected', 'success')
 
     } catch (error) {
-        addDebugLog(`Call disconnect error: ${error.message}`, 'error')
         lastError.value = error.message
     }
 }
@@ -1197,11 +1333,6 @@ const startCallTimer = () => {
 
 // Lifecycle
 onMounted(() => {
-    addDebugLog('Component mounted', 'info')
-    if (props.phoneNumbers && props.phoneNumbers.length > 0) {
-        fromNumber.value = props.phoneNumbers[0].phone_number
-        addDebugLog(`Default from number set: ${fromNumber.value}`, 'info')
-    }
     loadConnections()
 })
 
@@ -1253,32 +1384,5 @@ onUnmounted(() => {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Debug log animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 
-.debug-log-entry {
-  animation: fadeIn 0.3s ease-out;
-}
-
-/* Custom scrollbar for debug logs */
-.debug-logs::-webkit-scrollbar {
-  width: 8px;
-}
-
-.debug-logs::-webkit-scrollbar-track {
-  background: #f9fafb;
-  border-radius: 4px;
-}
-
-.debug-logs::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
-}
-
-.debug-logs::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
 </style> 

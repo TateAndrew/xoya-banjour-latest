@@ -39,6 +39,42 @@ const showingNavigationDropdown = ref(false);
                                 >
                                     Dashboard
                                 </NavLink>
+                                <NavLink
+                                    :href="route('dialer')"
+                                    :active="route().current('dialer')"
+                                >
+                                    Dialer
+                                </NavLink>
+                                <NavLink
+                                    :href="route('phone-numbers.index')"
+                                    :active="route().current('phone-numbers.*')"
+                                >
+                                    Phone Numbers
+                                </NavLink>
+                                <NavLink
+                                    :href="route('sip-trunks.index')"
+                                    :active="route().current('sip-trunks.*')"
+                                >
+                                    SIP Trunks
+                                </NavLink>
+                                <NavLink
+                                    :href="route('messaging-profiles.index')"
+                                    :active="route().current('messaging-profiles.*')"
+                                >
+                                    Messaging Profiles
+                                </NavLink>
+                                <NavLink
+                                    :href="route('messenger.index')"
+                                    :active="route().current('messenger.*')"
+                                >
+                                    SMS Messenger
+                                </NavLink>
+                                <NavLink
+                                    :href="route('users.index')"
+                                    :active="route().current('users.*')"
+                                >
+                                    Users
+                                </NavLink>
                             </div>
                         </div>
 
@@ -145,6 +181,36 @@ const showingNavigationDropdown = ref(false);
                             :active="route().current('dashboard')"
                         >
                             Dashboard
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('dialer')"
+                            :active="route().current('dialer')"
+                        >
+                            Dialer
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('phone-numbers.index')"
+                            :active="route().current('phone-numbers.*')"
+                        >
+                            Phone Numbers
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('sip-trunks.index')"
+                            :active="route().current('sip-trunks.*')"
+                        >
+                            SIP Trunks
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('messaging-profiles.index')"
+                            :active="route().current('messaging-profiles.*')"
+                        >
+                            Messaging Profiles
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('users.index')"
+                            :active="route().current('users.*')"
+                        >
+                            Users
                         </ResponsiveNavLink>
                     </div>
 

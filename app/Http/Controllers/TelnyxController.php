@@ -15,7 +15,7 @@ class TelnyxController extends Controller
      */
     public function __construct()
     {
-        Telnyx::setApiKey('KEY0198AE3F41EE2430EDEBCA1D1C9555BC_6awZdVb6KQBvCIXSZcrT8n');
+        Telnyx::setApiKey('KEY0198CD286DBF50F67B7833E70136D955_qwcmtnBzxZqKBNqx3flTIR');
     }
 
     /**
@@ -264,13 +264,70 @@ class TelnyxController extends Controller
     }
 
     /**
-     * List available connections
+     * List available connections from database
      */
     public function listConnections()
     {
         try {
+            $user = Auth::user();
+            
+            // Get SIP trunks from database for the current user
+            $sipTrunks = \App\Models\SipTrunk::where('user_id', $user->id)
+                ->where('status', 'active')
+                ->with(['phoneNumbers' => function($query) {
+                    $query->wherePivot('is_active', true);
+                }])
+                ->get();
+
+            $connectionList = [];
+            foreach ($sipTrunks as $sipTrunk) {
+                $connectionList[] = [
+                    'id' => $sipTrunk->id,
+                    'name' => $sipTrunk->name,
+                    'status' => $sipTrunk->status,
+                    'sip_uri' => $sipTrunk->sip_uri,
+                    'webhook_url' => $sipTrunk->webhook_url,
+                    'telnyx_connection_id' => $sipTrunk->telnyx_connection_id,
+                    'phone_numbers' => $sipTrunk->phoneNumbers->map(function($phoneNumber) {
+                        return [
+                            'id' => $phoneNumber->id,
+                            'phone_number' => $phoneNumber->phone_number,
+                            'assignment_type' => $phoneNumber->pivot->assignment_type,
+                            'is_active' => $phoneNumber->pivot->is_active,
+                            'assigned_at' => $phoneNumber->pivot->assigned_at,
+                            'last_used_at' => $phoneNumber->pivot->last_used_at,
+                            'settings' => $phoneNumber->pivot->settings,
+                        ];
+                    }),
+                    'credentials' => $sipTrunk->credentials,
+                    'settings' => $sipTrunk->settings,
+                    'metadata' => $sipTrunk->metadata,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'connections' => $connectionList
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to list connections from database: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to list connections: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * List available connections from Telnyx API (fallback)
+     */
+    public function listTelnyxConnections()
+    {
+        try {
             $connections = \Telnyx\Connection::all(['limit' => 50]);
-         $connectionList = [];
+            $connectionList = [];
             foreach ($connections->data as $connection) {
                 $connectionList[] = [
                     'id' => $connection->id,
@@ -287,7 +344,7 @@ class TelnyxController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Failed to list connections: ' . $e->getMessage());
+            Log::error('Failed to list connections from Telnyx: ' . $e->getMessage());
             
             return response()->json([
                 'success' => false,
@@ -362,6 +419,68 @@ class TelnyxController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => 'Failed to get call history: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+        /**
+     * Get available countries
+     */
+    public function getCountries()
+    {
+        try {
+            $telnyxService = app(\App\Services\TelynxService::class);
+            $result = $telnyxService->getAvailableCountries();
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $result['data']
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['error']
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get countries: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to get countries: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get available area codes for a country
+     */
+    public function getAreaCodes($countryCode)
+    {
+        try {
+            $telnyxService = app(\App\Services\TelynxService::class);
+            $result = $telnyxService->getAvailableAreaCodes($countryCode);
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $result['data']
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'error' => $result['error']
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get area codes: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to get area codes: ' . $e->getMessage()
             ], 500);
         }
     }

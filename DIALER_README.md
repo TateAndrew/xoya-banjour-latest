@@ -188,6 +188,26 @@ For technical support or questions:
 - Review Telnyx documentation
 - Open an issue on GitHub
 
+## Implementation Details
+
+### SIP Connection Management
+- **Database-Driven**: SIP connections are loaded from the local database instead of Telnyx API
+- **User-Specific**: Each user sees only their own SIP trunk connections
+- **Active Status**: Only active SIP trunks are displayed in the connection dropdown
+- **Real-time Updates**: Connection status and phone number assignments are refreshed dynamically
+
+### Phone Number Assignment
+- **Connection-Based**: Phone numbers are populated from the selected SIP connection
+- **Assignment Types**: Supports primary, secondary, and backup phone number assignments
+- **Active Filtering**: Only active phone number assignments are displayed
+- **Auto-Selection**: First available phone number is automatically selected when connection changes
+
+### WebRTC Integration
+- **Credential Management**: WebRTC client uses credentials stored in the selected SIP connection
+- **Fallback Support**: Graceful fallback to default credentials if connection credentials are unavailable
+- **Connection Validation**: WebRTC initialization requires a valid SIP connection selection
+- **Dynamic Switching**: WebRTC client can be reinitialized when switching between connections
+
 ---
 
 **Built with ❤️ using Laravel, Vue.js, and Telnyx WebRTC**

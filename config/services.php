@@ -43,6 +43,8 @@ return [
         'connection_id' => env('TELNYX_CONNECTION_ID', 'your-connection-id'),
         'sip_username' => env('TELNYX_SIP_USERNAME'),
         'sip_password' => env('TELNYX_SIP_PASSWORD'),
+        'messaging_profile_id' => env('TELNYX_MESSAGING_PROFILE_ID'),
+        'phone_number' => env('TELNYX_PHONE_NUMBER'),
     ],
 
 ];

@@ -19,5 +19,11 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // Call the SIP trunk seeder
+        $this->call([
+            SipTrunkSeeder::class,
+            RoleAndPermissionSeeder::class,
+        ]);
     }
 }

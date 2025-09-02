@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class PhoneNumber extends Model
 {
@@ -27,6 +28,8 @@ class PhoneNumber extends Model
         'purchased_at',
         'expires_at',
         'metadata',
+        'messaging_profile_id',
+        'assigned_to_profile_at',
     ];
 
     protected $casts = [
@@ -36,11 +39,34 @@ class PhoneNumber extends Model
         'setup_fee' => 'decimal:2',
         'purchased_at' => 'datetime',
         'expires_at' => 'datetime',
+        'assigned_to_profile_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function messagingProfile(): BelongsTo
+    {
+        return $this->belongsTo(MessagingProfile::class);
+    }
+
+    public function sipTrunks(): BelongsToMany
+    {
+        return $this->belongsToMany(SipTrunk::class, 'sip_trunk_phone_number')
+                    ->withPivot(['assignment_type', 'is_active', 'assigned_at', 'last_used_at', 'settings'])
+                    ->withTimestamps();
+    }
+
+    public function activeSipTrunks(): BelongsToMany
+    {
+        return $this->sipTrunks()->wherePivot('is_active', true);
+    }
+
+    public function primarySipTrunk(): BelongsToMany
+    {
+        return $this->sipTrunks()->wherePivot('assignment_type', 'primary');
     }
 
     public function isAvailable(): bool
@@ -66,5 +92,15 @@ class PhoneNumber extends Model
     public function getFormattedNumberAttribute(): string
     {
         return '+' . $this->country_code . ' ' . $this->phone_number;
+    }
+
+    public function isAssignedToSipTrunk(): bool
+    {
+        return $this->activeSipTrunks()->exists();
+    }
+
+    public function getAssignedSipTrunk(): ?SipTrunk
+    {
+        return $this->primarySipTrunk()->first();
     }
 }

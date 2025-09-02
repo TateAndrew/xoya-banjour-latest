@@ -10,11 +10,30 @@
 
         <div class="py-12">
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                <!-- Header with Purchase Button -->
+                <div class="mb-6 flex justify-between items-center">
+                    <h3 class="text-2xl font-bold text-gray-900">Your Phone Numbers</h3>
+                    <div class="flex space-x-3">
+                        <Link 
+                            :href="route('phone-numbers.manage')" 
+                            class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                        >
+                            Manage Numbers
+                        </Link>
+                        <Link 
+                            :href="route('phone-numbers.purchase-page')" 
+                            class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
+                        >
+                            Purchase New Number
+                        </Link>
+                    </div>
+                </div>
+
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6 text-gray-900">
-                        <!-- Search Section -->
+                        <!-- Quick Search Section -->
                         <div class="mb-8">
-                            <h3 class="text-lg font-medium mb-4">Search Available Numbers</h3>
+                            <h3 class="text-lg font-medium mb-4">Quick Search</h3>
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">Country</label>
