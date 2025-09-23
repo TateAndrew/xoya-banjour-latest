@@ -14,26 +14,30 @@
             </div>
         </template>
 
-        <div class="py-12">
+       
+
+        <!-- Regular Dialer Interface -->
+        <div>
             <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <!-- Main Dialer Interface -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Beautiful Telnyx Dialer Interface -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     
                     <!-- Left Panel - Call Controls -->
                     <div class="lg:col-span-1">
                         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                             <div class="p-6 space-y-6">
-                                <!-- Call Status -->
+                                <!-- Beautiful Call Status Display -->
                                 <div class="text-center">
-                                    <div class="w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center text-4xl"
+                                    <div class="w-32 h-32 mx-auto mb-6 rounded-full flex items-center justify-center text-5xl shadow-lg transform transition-all duration-300 hover:scale-105"
                                          :class="callStatusClass">
                                         {{ callStatusIcon }}
                                     </div>
-                                    <h3 class="text-lg font-semibold text-gray-900">{{ callStatusText }}</h3>
-                                    <p v-if="callDirection" class="text-sm text-gray-600 mb-2">
+                                    <h3 class="text-xl font-bold text-gray-900 mb-2">{{ callStatusText }}</h3>
+                                    <div v-if="callDirection" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium mb-3"
+                                         :class="callDirection === 'incoming' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'">
                                         {{ callDirection === 'incoming' ? '📞 Incoming Call' : '📞 Outgoing Call' }}
-                                    </p>
-                                    <p v-if="callDuration" class="text-2xl font-mono text-blue-600">{{ callDuration }}</p>
+                                    </div>
+                                    <p v-if="callDuration" class="text-3xl font-mono text-blue-600 font-bold tracking-wider">{{ callDuration }}</p>
                                     
                                     <!-- Debug Information -->
                                     <div class="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-left">
@@ -43,65 +47,91 @@
                                         <div>isCallActive: {{ isCallActive }}</div>
                                         <div>callDirection: {{ callDirection }}</div>
                                         <div>callStatus: {{ callStatus }}</div>
-                                        <div>Show Ringing Buttons: {{ callStatus === 'ringing' && isIncomingCall }}</div>
-                                        <div>Show Active Buttons: {{ callStatus === 'active' }}</div>
+                                        <div>currentCall exists: {{ currentCall !== null }}</div>
+                                        <div>Show Container: {{ currentCall !== null || isRinging }}</div>
+                                        <div>Show Incoming Buttons: {{ isIncomingCall && isRinging && !isCallActive }}</div>
+                                        <div>Show Outgoing Buttons: {{ !isIncomingCall && isRinging && !isCallActive }}</div>
+                                        <div>Show Active Buttons: {{ isCallActive }}</div>
                                     </div>
                                 </div>
-                                    <!-- Ringing State - Show only Answer and Decline buttons -->
-                                    <div v-if="callStatus === 'ringing' && isIncomingCall" class="space-y-4">
-                                        <!-- Answer Call Button (for incoming calls only) -->
-                                        <button @click="answerCall" 
-                                                class="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-200">
-                                            <div class="flex items-center justify-center space-x-2">
-                                                <span class="text-xl">📞</span>
-                                                <span>Answer Call</span>
-                                            </div>
-                                        </button>
-                                        
-                                        <!-- Decline Call Button (for incoming calls only) -->
-                                        <button @click="rejectCall" 
-                                                class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
-                                            <div class="flex items-center justify-center space-x-2">
-                                                <span class="text-xl">❌</span>
-                                                <span>Decline Call</span>
-                                            </div>
-                                        </button>
-                                    </div>
+                                <div  class="space-y-4">
+                                        <!-- Incoming Call Buttons: Answer and Decline for incoming calls -->
+                                        <template v-if="isIncomingCall && !isCallActive">
+                                            <!-- Answer Call Button -->
+                                            <button @click="answerCall" 
+                                                    class="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                                <div class="flex items-center justify-center space-x-2">
+                                                    <span class="text-xl">📞</span>
+                                                    <span>Answer Call</span>
+                                                </div>
+                                            </button>
+                                            
+                                            <!-- Decline Call Button -->
+                                            <button @click="rejectCall" 
+                                                    class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                                <div class="flex items-center justify-center space-x-2">
+                                                    <span class="text-xl">❌</span>
+                                                    <span>Decline Call</span>
+                                                </div>
+                                            </button>
+                                        </template>
 
-                                    <!-- Active Call State - Show call control buttons -->
-                                    <div v-if="callStatus === 'active'" class="space-y-4">
-                                        <!-- Mute Button -->
-                                        <button @click="toggleMute" 
-                                                :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
-                                                    isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'
-                                                }`">
-                                            <div class="flex items-center justify-center space-x-2">
-                                                <span class="text-xl">{{ isMuted ? '🔇' : '🎤' }}</span>
-                                                <span>{{ isMuted ? 'Unmute' : 'Mute' }}</span>
-                                            </div>
-                                        </button>
+                                        <!-- Outgoing Call Buttons: End call during ringing/trying -->
+                                        <template v-if="isConnecting && !isCallActive">
+                                            <!-- End Call Button for outgoing calls -->
+                                          <button @click="endCall" 
+                                                    class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                                <div class="flex items-center justify-center space-x-2">
+                                                    <span class="text-xl">📴</span>
+                                                    <span>End Call</span>
+                                                </div>
+                                            </button>
+                                        </template>
 
-                                        <!-- Hold Button -->
-                                        <button @click="toggleHold" 
-                                                :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
-                                                    isOnHold ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'
-                                                }`">
-                                            <div class="flex items-center justify-center space-x-2">
-                                                <span class="text-xl">{{ isOnHold ? '⏸️' : '⏸️' }}</span>
-                                                <span>{{ isOnHold ? 'Resume' : 'Hold' }}</span>
-                                            </div>
-                                        </button>
+                                        <!-- Active Call Buttons: Only when call is active -->
+                                            <!-- Mute Button -->
+                                    <template v-if="isCallActive && callDirection === 'outgoing'">
+                                            <button @click="toggleMute" 
+                                                    :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
+                                                        isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'
+                                                    }`">
+                                                <div class="flex items-center justify-center space-x-2">
+                                                    <span class="text-xl">{{ isMuted ? '🔇' : '🎤' }}</span>
+                                                    <span>{{ isMuted ? 'Unmute' : 'Mute' }}</span>
+                                                </div>
+                                            </button>
 
-                                        <!-- Hangup Button -->
-                                        <button @click="endCall" 
-                                                class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
-                                            <div class="flex items-center justify-center space-x-2">
-                                                <span class="text-xl">📴</span>
-                                                <span>End Call</span>
-                                            </div>
-                                        </button>
+                                            <!-- Hold Button -->
+                                            <button @click="toggleHold" 
+                                                    :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
+                                                        isOnHold ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'
+                                                    }`">
+                                                <div class="flex items-center justify-center space-x-2">
+                                                    <span class="text-xl">{{ isOnHold ? '⏸️' : '⏸️' }}</span>
+                                                    <span>{{ isOnHold ? 'Resume' : 'Hold' }}</span>
+                                                </div>
+                                            </button>
 
-                                        <!-- Disconnect Button -->
+                                            <!-- Hangup Button -->
+                                            <button @click="endCall" 
+                                                    class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                                <div class="flex items-center justify-center space-x-2">
+                                                    <span class="text-xl">📴</span>
+                                                    <span>End Call</span>
+                                                </div>
+                                            </button>
+
+                                            <!-- Transcription Button -->
+                                            <button @click="toggleTranscription" 
+                                                    :class="transcriptionStatus === 'started' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'"
+                                                    class="w-full py-4 text-white rounded-lg font-semibold transition-all duration-200">
+                                                <div class="flex items-center justify-center space-x-2">
+                                                    <span class="text-xl">{{ transcriptionStatus === 'started' ? '📝' : '🎤' }}</span>
+                                                    <span>{{ transcriptionStatus === 'started' ? 'Stop Transcript' : 'Start Transcript' }}</span>
+                                                </div>
+                                            </button>
+
+                                            <!-- Disconnect Button -->
                                         <button @click="disconnectCall" 
                                                 class="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-all duration-200">
                                             <div class="flex items-center justify-center space-x-2">
@@ -109,7 +139,8 @@
                                                 <span>Disconnect</span>
                                             </div>
                                         </button>
-                                    </div>
+                                    </template>
+                                </div>
 
                                 <!-- Connection Status -->
                                 <div class="bg-gray-50 rounded-lg p-4">
@@ -158,9 +189,7 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Center Panel - Dialer -->
+                    </div>                    <!-- Center Panel - Dialer -->
                     <div class="lg:col-span-1">
                         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                             <div class="p-6 space-y-6">
@@ -270,63 +299,65 @@
                                     </div>
                                 </div>
 
-                                <!-- Dialpad -->
-                                <div class="bg-gray-50 rounded-lg p-4">
-                                    <h4 class="text-sm font-medium text-gray-700 mb-3 text-center">Dialpad</h4>
-                                    <div class="grid grid-cols-3 gap-2">
+                                <!-- Beautiful Telnyx Dialpad -->
+                                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 shadow-inner">
+                                    <h4 class="text-lg font-bold text-gray-800 mb-4 text-center">
+                                        {{ isCallActive ? '📱 DTMF Keypad' : '📞 Dialer' }}
+                                    </h4>
+                                    <div class="grid grid-cols-3 gap-3">
                                         <!-- Row 1: 1, 2, 3 -->
                                         <button @click="addDigit('1')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-blue-100 active:scale-95 transition-all duration-150 text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             1
                                         </button>
                                         <button @click="addDigit('2')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-blue-100 active:scale-95 transition-all duration-150 text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             2
                                         </button>
                                         <button @click="addDigit('3')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-blue-100 active:scale-95 transition-all duration-150 text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             3
                                         </button>
                                         
                                         <!-- Row 2: 4, 5, 6 -->
                                         <button @click="addDigit('4')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             4
                                         </button>
                                         <button @click="addDigit('5')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             5
                                         </button>
                                         <button @click="addDigit('6')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             6
                                         </button>
                                         
                                         <!-- Row 3: 7, 8, 9 -->
                                         <button @click="addDigit('7')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             7
                                         </button>
                                         <button @click="addDigit('8')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             8
                                         </button>
                                         <button @click="addDigit('9')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             9
                                         </button>
                                         
                                         <!-- Row 4: *, 0, # -->
                                         <button @click="addDigit('*')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-blue-100 active:scale-95 transition-all duration-150 text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             *
                                         </button>
                                         <button @click="addDigit('0')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-blue-100 active:scale-95 transition-all duration-150 text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             0
                                         </button>
                                         <button @click="addDigit('#')" 
-                                                class="p-4 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-blue-100 active:scale-95 transition-all duration-150 text-xl font-semibold text-gray-700">
+                                                class="h-16 bg-white hover:bg-blue-50 active:bg-blue-100 border border-gray-300 rounded-xl shadow-sm hover:shadow-md active:scale-95 transition-all duration-200 text-2xl font-bold text-gray-800 hover:text-blue-600">
                                             #
                                         </button>
                                     </div>
@@ -344,13 +375,13 @@
                                     </div>
                                 </div>
 
-                                <!-- Call Button -->
+                                <!-- Beautiful Call Button -->
                                 <button @click="startCall" 
                                         :disabled="!canMakeCall || isConnecting"
-                                        class="w-full py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-lg font-semibold transition-all duration-200">
-                                    <div class="flex items-center justify-center space-x-2">
-                                        <span v-if="isConnecting" class="animate-spin">🔄</span>
-                                        <span v-else>📞</span>
+                                        class="w-full py-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed text-xl font-bold shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 transition-all duration-200">
+                                    <div class="flex items-center justify-center space-x-3">
+                                        <span v-if="isConnecting" class="animate-spin text-2xl">🔄</span>
+                                        <span v-else class="text-2xl">📞</span>
                                         <span>{{ isConnecting ? 'Connecting...' : 'Start Call' }}</span>
                                     </div>
                                 </button>
@@ -405,6 +436,39 @@
                                             Clear
                                         </button>
                                     </h3>
+                                </div>
+
+                                <!-- Real-time Transcription Display -->
+                                <div v-if="realtimeTranscript || realtimeTranscriptionStatus !== 'idle'" 
+                                     class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <h4 class="font-semibold text-blue-900 text-sm">
+                                            🎤 Real-time Transcription
+                                        </h4>
+                                        <div class="flex items-center space-x-2">
+                                            <span :class="`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                                realtimeTranscriptionStatus === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                                                realtimeTranscriptionStatus === 'completed' ? 'bg-green-100 text-green-800' :
+                                                'bg-gray-100 text-gray-800'
+                                            }`">
+                                                {{ realtimeTranscriptionStatus === 'processing' ? '🔄 Processing' :
+                                                   realtimeTranscriptionStatus === 'completed' ? '✅ Completed' : 
+                                                   '⏸️ Idle' }}
+                                            </span>
+                                            <span v-if="transcriptionConfidence" 
+                                                  class="text-xs text-blue-600">
+                                                {{ Math.round(transcriptionConfidence * 100) }}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm text-blue-800 bg-white p-3 rounded border">
+                                        <p v-if="realtimeTranscript" class="italic">
+                                            "{{ realtimeTranscript }}"
+                                        </p>
+                                        <p v-else class="text-gray-500">
+                                            Waiting for speech...
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <!-- Transcript Content -->
@@ -469,6 +533,12 @@ const isConnecting = ref(false)
 const callStatus = ref('')
 const backendStatus = ref('disconnected')
 const webrtcStatus = ref('disconnected')
+
+// Real-time transcription data
+const currentCallControlId = ref(null)
+const realtimeTranscript = ref('')
+const transcriptionConfidence = ref(null)
+const realtimeTranscriptionStatus = ref('idle') // idle, processing, completed
 const lastError = ref('')
 
 const callDuration = ref('00:00')
@@ -477,8 +547,11 @@ const isConnected = ref(false)
 const isMuted = ref(false)
 const isOnHold = ref(false)
 const isIncomingCall = ref(false) // Track if current call is incoming
+const transcriptionStatus = ref('') // Track transcription status: '', 'started', 'stopped'
 const callDirection = ref('') // 'incoming' or 'outgoing'
 const transcript = ref([])
+const participants = ref([])
+const callId = ref('')
 let callTimer = null
 let webrtcClient = null
 let currentCall = null
@@ -562,6 +635,16 @@ const callStatusMessage = computed(() => {
     if (isConnected.value) return 'Call connected successfully!'
     if (callStatus.value === 'failed') return 'Call failed to connect'
     if (callStatus.value === 'busy') return 'Line is busy'
+    if (callStatus.value === 'destroy') return 'Call has been destroyed'
+    if (callStatus.value === 'purge') return 'Call has been purged'
+    if (callStatus.value === 'failed') return 'Call failed to connect'
+    if (callStatus.value === 'new') return 'Call has been created'
+    if (callStatus.value === 'trying') return 'Call is trying to connect'
+    if (callStatus.value === 'requesting') return 'Call is requesting to connect'
+    if (callStatus.value === 'recovering') return 'Call is recovering'
+    if (callStatus.value === 'ringing') return 'Call is ringing'
+    if (callStatus.value === 'answering') return 'Call is answering'
+    if (callStatus.value === 'early') return 'Call is early'
     return callStatus.value
 })
 
@@ -589,7 +672,19 @@ const safeStringify = (obj) => {
 
 // Dialpad functions
 const addDigit = (digit) => {
-    toNumber.value += digit
+    if (isCallActive.value && currentCall) {
+        // Send DTMF during active call using official Telnyx method
+        try {
+            currentCall.dtmf(digit)
+            addTranscriptEntry('DTMF', `📱 Sent DTMF tone: ${digit}`)
+            showCallNotification('📱 DTMF', `Sent tone: ${digit}`, 'info')
+        } catch (error) {
+            addTranscriptEntry('Error', `Failed to send DTMF ${digit}: ${error.message}`)
+        }
+    } else {
+        // Add to dialer number when not in call
+        toNumber.value += digit
+    }
 }
 
 const addPlus = () => {
@@ -638,9 +733,9 @@ const playNotificationSound = (type) => {
                 audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT'
                 break
         }
-        audio.play().catch(e => console.log('Audio notification failed:', e))
+        audio.play().catch(e => {})
     } catch (error) {
-        console.log('Notification sound error:', error)
+        // Audio notification error handled silently
     }
 }
 
@@ -654,9 +749,7 @@ const showCallNotification = (title, message, type = 'info') => {
         })
     }
     
-    // Console notification
-    const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '📞'
-    console.log(`${emoji} ${title}: ${message}`)
+    // Notification logged to transcript instead of console
     
     // Play sound
     playNotificationSound(type === 'success' ? 'connected' : type === 'error' ? 'hangup' : 'ringing')
@@ -828,45 +921,33 @@ const initializeWebRTC = async () => {
         webrtcClient.on('telnyx.ready', () => {
             webrtcStatus.value = 'ready'
             addTranscriptEntry('System', 'WebRTC client initialized and ready for calls')
-            console.log('WebRTC client ready, can now receive incoming calls')
         })
 
         webrtcClient.on('telnyx.error', (error) => {
             lastError.value = error.message
             webrtcStatus.value = 'error'
             addTranscriptEntry('Error', `WebRTC error: ${error.message}`)
-            console.error('WebRTC error:', error)
         })
 
         webrtcClient.on('telnyx.notification', (notification) => {
-            console.log('Telnyx notification received:', notification)
             
-            // Handle WebRTC notifications according to Telnyx documentation
-            
-            if (notification.type === 'callUpdate') {
+            // Handle call updates according to official Telnyx documentation
+            if (notification.type === 'callUpdate' && notification.call) {
                 handleCallUpdate(notification.call)
             }
             
-            // Handle call recovery
+            // Handle incoming calls - official way according to docs
+            if (notification.type === 'callUpdate' && notification.call.state === 'ringing') {
+                const callerNumber = notification.call.params?.caller_id_number || 'Unknown'
+                addTranscriptEntry('System', `📞 Incoming call from ${callerNumber}`)
+                showCallNotification('📞 Incoming Call', `Call from ${callerNumber}`, 'info')
+                handleIncomingCall(notification.call)
+            }
+            
+            // Handle call recovery after page refresh
             if (notification.type === 'callRecovery' && notification.call) {
-                addTranscriptEntry('System', 'Call recovery in progress...')
+                addTranscriptEntry('System', '🔄 Recovering call after page refresh...')
                 handleCallUpdate(notification.call)
-            }
-            
-            // Handle incoming calls - this is the key event for receiving calls
-            if (notification.type === 'incomingCall' && notification.call) {
-                const callerNumber = notification.call.params?.caller_id_number || 'Unknown'
-                addTranscriptEntry('System', `Incoming call notification received from ${callerNumber}`)
-                showCallNotification('📞 Incoming Call', `Incoming call from ${callerNumber}`, 'info')
-                handleIncomingCall(notification.call)
-            }
-            
-            // Handle other notification types that might indicate incoming calls
-            if (notification.type === 'call' && notification.call && notification.call.direction === 'inbound') {
-                const callerNumber = notification.call.params?.caller_id_number || 'Unknown'
-                addTranscriptEntry('System', `Inbound call detected from ${callerNumber}`)
-                showCallNotification('📞 Inbound Call', `Call from ${callerNumber}`, 'info')
-                handleIncomingCall(notification.call)
             }
         })
 
@@ -880,23 +961,14 @@ const initializeWebRTC = async () => {
 
 // Handle incoming calls
 const handleIncomingCall = (call) => {
+    
     try {
-        console.log('🔔 handleIncomingCall called with:', call)
-        
         currentCall = call
         callStatus.value = 'ringing'
-        isRinging.value = true
+        isRinging.value = false
         isConnected.value = false
         isIncomingCall.value = true // Mark as incoming call
         callDirection.value = 'incoming'
-        
-        console.log('📞 Incoming call state set:', {
-            isIncomingCall: isIncomingCall.value,
-            isRinging: isRinging.value,
-            isCallActive: isCallActive.value,
-            callDirection: callDirection.value,
-            shouldShowButtons: isIncomingCall.value && isRinging.value && !isCallActive.value
-        })
         
         // Extract caller information from the call object
         if (call && call.params) {
@@ -922,7 +994,6 @@ const handleIncomingCall = (call) => {
             })
         }
     } catch (error) {
-        console.error('❌ Error in handleIncomingCall:', error)
         addTranscriptEntry('Error', `Failed to handle incoming call: ${error.message}`)
     }
 }
@@ -930,7 +1001,7 @@ const handleIncomingCall = (call) => {
 // Handle call updates
 const handleCallUpdate = (call) => {
     callStatus.value = call.state
-    debugger
+
     switch (call.state) {
         case 'new':
             addTranscriptEntry('Status', 'New call created')
@@ -938,14 +1009,15 @@ const handleCallUpdate = (call) => {
             break
             
         case 'trying':
-            isRinging.value = true
+            isConnecting.value = true
             isConnected.value = false
             addTranscriptEntry('Status', 'Attempting to call...')
             showCallNotification('📞 Attempting Call', `Trying to call ${toNumber.value}...`, 'info')
             break
             
         case 'requesting':
-            isRinging.value = true
+            isConnecting.value = true
+            isRinging.value = false
             isConnected.value = false
             addTranscriptEntry('Status', 'Sending call request to server...')
             showCallNotification('📡 Sending Request', 'Call request being sent to server', 'info')
@@ -964,14 +1036,14 @@ const handleCallUpdate = (call) => {
             break
             
         case 'answering':
-            isRinging.value = true
+            isRinging.value = false
             isConnected.value = false
             addTranscriptEntry('Status', 'Attempting to answer call...')
             showCallNotification('📞 Answering Call', 'Attempting to answer inbound call', 'info')
             break
             
         case 'early':
-            isRinging.value = true
+            isRinging.value = false
             isConnected.value = false
             addTranscriptEntry('Status', 'Receiving early media...')
             showCallNotification('🎵 Early Media', 'Receiving media before call answered', 'info')
@@ -1072,7 +1144,7 @@ const startCall = async () => {
 
         // Validate connection selection
         validateConnectionSelection()
-
+        
         isConnecting.value = true
         isIncomingCall.value = false // Mark as outgoing call
         callDirection.value = 'outgoing'
@@ -1080,16 +1152,16 @@ const startCall = async () => {
         addTranscriptEntry('Call', `Initiating outgoing call from ${fromNumber.value} to ${toNumber.value}`)
         addTranscriptEntry('System', `Using SIP connection: ${selectedConnectionData.value.name}`)
         
-        const callDetail = {
-            callerNumber: fromNumber.value,
+        // Create call according to official Telnyx documentation
+        const callParams = {
             destinationNumber: toNumber.value,
-            connectionId: selectedConnectionData.value.telnyx_connection_id || selectedConnection.value,
-            sipTrunkId: selectedConnection.value,
-            connectionName: selectedConnectionData.value.name,
-            connectionType: 'database',
+            callerNumber: fromNumber.value,
+            audio: true,
+            video: false
         }
         
-        currentCall = webrtcClient.newCall(callDetail)
+        addTranscriptEntry('Debug', `📞 Creating call with params: ${JSON.stringify(callParams)}`)
+        currentCall = webrtcClient.newCall(callParams)
         
         // Set up call event listeners
         if (currentCall) {
@@ -1114,33 +1186,46 @@ const startCall = async () => {
 // Call control functions
 const toggleMute = () => {
     try {
-        if (localStream) {
-            const audioTrack = localStream.getAudioTracks()[0]
-            if (audioTrack) {
-                audioTrack.enabled = !audioTrack.enabled
-                isMuted.value = !audioTrack.enabled
-                
-                if (isMuted.value) {
-                    addTranscriptEntry('Control', 'Microphone muted')
-                    showCallNotification('🔇 Muted', 'Microphone has been muted', 'info')
-                } else {
-                    addTranscriptEntry('Control', 'Microphone unmuted')
-                    showCallNotification('🎤 Unmuted', 'Microphone has been unmuted', 'info')
-                }
+        if (currentCall) {
+            // Use official Telnyx call methods
+            if (isMuted.value) {
+                currentCall.unmuteAudio()
+                isMuted.value = false
+                addTranscriptEntry('Control', '🎤 Microphone unmuted')
+                showCallNotification('🎤 Unmuted', 'Audio unmuted using Telnyx method', 'success')
+            } else {
+                currentCall.muteAudio()
+                isMuted.value = true
+                addTranscriptEntry('Control', '🔇 Microphone muted')
+                showCallNotification('🔇 Muted', 'Audio muted using Telnyx method', 'info')
             }
+        } else {
+            addTranscriptEntry('Warning', 'No active call to mute/unmute')
         }
     } catch (error) {
+        addTranscriptEntry('Error', `Mute operation failed: ${error.message}`)
     }
 }
 
-const answerCall = () => {
+const answerCall = () => {  
+
+    
     try {
-        if (currentCall && currentCall.answer) {
+        
+        if (currentCall) {
             currentCall.answer()
+            isConnecting.value = false
+            isRinging.value = false
+            isCallActive.value = true
+            isConnected.value = true
+            
             addTranscriptEntry('Control', 'Incoming call answered')
             showCallNotification('✅ Call Answered', 'Incoming call has been answered', 'success')
+            callStatus.value = 'answering'
+            addTranscriptEntry('Debug', 'Answer call initiated, waiting for state change...')
         } else {
-            addTranscriptEntry('Warning', 'Answer method not available')
+            const errorMsg = !currentCall ? 'No current call object' : 'Answer method not available on call object'
+            addTranscriptEntry('Warning', `Cannot answer call: ${errorMsg}`)
         }
     } catch (error) {
         addTranscriptEntry('Error', `Failed to answer call: ${error.message}`)
@@ -1196,59 +1281,48 @@ const simulateIncomingCall = () => {
 
 const rejectCall = () => {
     try {
-        if (currentCall && currentCall.reject) {
-            currentCall.reject()
-            addTranscriptEntry('Control', 'Incoming call rejected')
-            showCallNotification('❌ Call Rejected', 'Incoming call has been rejected', 'info')
+       if (currentCall && currentCall.gotAnswer == false) {
+            // Check if call is still in a valid state for hangup
+            const validStatesForHangup = ['new', 'trying', 'ringing', 'early']
+            if (validStatesForHangup.includes(currentCall.state)) {
+                addTranscriptEntry('Debug', `Rejecting call in state: ${currentCall.state}`)
+                currentCall.hangup();
+                addTranscriptEntry('Control', 'Incoming call rejected')
+                showCallNotification('❌ Call Rejected', 'Incoming call has been rejected', 'info')
+            } else {
+                addTranscriptEntry('Debug', `Cannot reject call in state: ${currentCall.state}`)
+                addTranscriptEntry('Control', 'Call cannot be rejected in current state')
+            }
             resetCallStates()
         } else {
             addTranscriptEntry('Warning', 'Reject method not available')
         }
     } catch (error) {
         addTranscriptEntry('Error', `Failed to reject call: ${error.message}`)
+        resetCallStates()
     }
 }
 
-const toggleHold = () => {
+const toggleHold = async () => {
     try {
-        isOnHold.value = !isOnHold.value
-        
-        if (isOnHold.value) {
-            // Put call on hold
-            if (currentCall && currentCall.hold) {
-                currentCall.hold()
-                addTranscriptEntry('Control', 'Call put on hold')
-                showCallNotification('⏸️ Call On Hold', 'Call has been put on hold', 'info')
-            } else {
-                // Fallback: mute audio to simulate hold
-                if (localStream) {
-                    const audioTrack = localStream.getAudioTracks()[0]
-                    if (audioTrack) {
-                        audioTrack.enabled = false
-                    }
-                }
-                addTranscriptEntry('Control', 'Call put on hold (audio muted)')
-                showCallNotification('⏸️ Call On Hold', 'Call has been put on hold', 'info')
-            }
-        } else {
-            // Resume call from hold
-            if (currentCall && currentCall.unhold) {
-                currentCall.unhold()
-                addTranscriptEntry('Control', 'Call resumed from hold')
-                showCallNotification('▶️ Call Resumed', 'Call has been resumed from hold', 'success')
-            } else {
-                // Fallback: unmute audio to simulate resume
-                if (localStream) {
-                    const audioTrack = localStream.getAudioTracks()[0]
-                    if (audioTrack) {
-                        audioTrack.enabled = true
-                    }
-                }
-                addTranscriptEntry('Control', 'Call resumed from hold (audio restored)')
-                showCallNotification('▶️ Call Resumed', 'Call has been resumed from hold', 'success')
-            }
+        if (!currentCall) {
+            addTranscriptEntry('Warning', 'No active call to hold/unhold')
+            return
         }
         
+        if (isOnHold.value) {
+            // Resume call using official Telnyx method
+            await currentCall.unhold()
+            isOnHold.value = false
+            addTranscriptEntry('Control', '▶️ Call resumed from hold')
+            showCallNotification('▶️ Call Resumed', 'Call resumed using Telnyx method', 'success')
+        } else {
+            // Put call on hold using official Telnyx method
+            await currentCall.hold()
+            isOnHold.value = true
+            addTranscriptEntry('Control', '⏸️ Call put on hold')
+            showCallNotification('⏸️ Call On Hold', 'Call held using Telnyx method', 'info')
+        }
     } catch (error) {
         addTranscriptEntry('Error', `Hold operation failed: ${error.message}`)
     }
@@ -1256,26 +1330,23 @@ const toggleHold = () => {
 
 const endCall = (skipHangup = false) => {
     try {
-        
-        if (currentCall) {
-            // Only try to hangup if the call is not already in a terminated state
-            const terminatedStates = ['hangup', 'destroy', 'purge', 'failed', 'busy']
-            const currentState = callStatus.value
-            
-            if (!terminatedStates.includes(currentState)) {
-                addTranscriptEntry('Control', 'Call ended by user')
-                showCallNotification('📴 Call Ended', 'Call terminated by user', 'info')
+        if (currentCall ) {
+            // Check if call is still in a valid state for hangup
+            const validStatesForHangup = ['new', 'trying', 'ringing', 'early', 'active', 'held']
+            if (validStatesForHangup.includes(currentCall.state)) {
+                addTranscriptEntry('Debug', `Attempting to hangup call in state: ${currentCall.state}`)
                 currentCall.hangup()
             } else {
-                addTranscriptEntry('System', 'Call already terminated by server')
+                addTranscriptEntry('Debug', `Skipping hangup for call in state: ${currentCall.state}`)
             }
-            currentCall = null
+        } else if (skipHangup) {
+            addTranscriptEntry('Debug', 'Skipping hangup as requested (call already terminated)')
         }
-        if (callTimer) {
-            clearInterval(callTimer)
-            callTimer = null
-        }
-
+        
+        // Clear call reference and timer
+        currentCall = null
+        clearInterval(callTimer)
+    
         // Reset all call states
         isCallActive.value = false
         isRinging.value = false
@@ -1286,11 +1357,97 @@ const endCall = (skipHangup = false) => {
         isConnecting.value = false
         callStatus.value = ''
         callDuration.value = '00:00'
+        transcriptionStatus.value = ''
         
         // Reset call states for next call
         addTranscriptEntry('System', 'Call session ended, ready for next call')
     } catch (error) {
+        addTranscriptEntry('Error', `Error ending call: ${error.message}`)
         lastError.value = error.message
+        
+        // Still reset states even if hangup failed
+        currentCall = null
+        clearInterval(callTimer)
+        isCallActive.value = false
+        isRinging.value = false
+        isConnected.value = false
+        isOnHold.value = false
+        isIncomingCall.value = false
+        callDirection.value = ''
+        isConnecting.value = false
+        callStatus.value = ''
+        callDuration.value = '00:00'
+        transcriptionStatus.value = ''
+    }
+}
+
+// Toggle transcription for the current call
+const toggleTranscription = async () => {
+    try {
+
+        
+        if (!currentCall || !currentCall.options.telnyxSessionId) {
+            addTranscriptEntry('System', 'No active call to transcribe')
+            return
+        }
+        // Fetch call details from database to get call_control_id
+        const callResponse = await fetch(`/api/calls/${currentCall.options.telnyxSessionId}`)
+        const callData = await callResponse.json()
+        
+        if (!callData.success || !callData.data.call_control_id) {
+            addTranscriptEntry('System', 'Call control ID not found for this call')
+            return
+        }
+
+        const callControlId = callData.data.call_control_id
+
+        if (transcriptionStatus.value === 'started') {
+            // Stop transcription
+            const response = await fetch('/api/transcription/stop', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    call_control_id: callControlId
+                })
+            })
+
+            const result = await response.json()
+            
+            if (result.success) {
+                transcriptionStatus.value = 'stopped'
+                addTranscriptEntry('System', 'Transcription stopped')
+            } else {
+                addTranscriptEntry('System', 'Failed to stop transcription: ' + result.message)
+            }
+        } else {
+            // Start transcription
+            const response = await fetch('/api/transcription/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    call_control_id: callControlId,
+                    language: 'en',
+                    transcription_engine: 'B'
+                })
+            })
+
+            const result = await response.json()
+            
+            if (result.success) {
+                transcriptionStatus.value = 'started'
+                addTranscriptEntry('System', 'Transcription started')
+            } else {
+                addTranscriptEntry('System', 'Failed to start transcription: ' + result.message)
+            }
+        }
+    } catch (error) {
+        addTranscriptEntry('System', 'Transcription error: ' + error.message)
     }
 }
 
@@ -1304,6 +1461,7 @@ const resetCallStates = () => {
     callDirection.value = ''
     callStatus.value = ''
     callDuration.value = '00:00'
+    transcriptionStatus.value = ''
 }
 
 const disconnectCall = () => {
@@ -1337,7 +1495,83 @@ const startCallTimer = () => {
 // Lifecycle
 onMounted(() => {
     loadConnections()
+    
+    // Listen for real-time transcription updates
+    if (window.Echo) {
+        
+        window.Echo.channel('call-transcription')
+            .listen('.transcription.updated', (e) => {
+                console.log('Received transcription update:', e)
+                
+                // Update transcription data
+                realtimeTranscript.value = e.transcript_text || ''
+                transcriptionConfidence.value = e.confidence
+                realtimeTranscriptionStatus.value = e.status
+                currentCallControlId.value = e.call_control_id
+                
+                // Add to transcript entries
+                if (e.latest_transcript) {
+                    const confidenceText = e.confidence ? ` (${Math.round(e.confidence * 100)}%)` : ''
+                    const finalText = e.is_final ? ' [FINAL]' : ' [INTERIM]'
+                    addTranscriptEntry('Transcription', `${e.latest_transcript}${confidenceText}`)
+                }
+                // Show alert notification for final transcripts
+                if (e.is_final) {
+                    alert(`Transcription completed: ${e.latest_transcript}`)
+                }
+            })
+    } else {
+        console.warn('Laravel Echo not available for real-time transcription updates')
+    }
+    
+    // Initialize sample participants for demo
+    participants.value = [
+        {
+            id: 1,
+            name: 'John Doe',
+            phone: '+1 (555) 123-4567',
+            status: 'Connected',
+            isMuted: false,
+            isSpeaking: false,
+            isVideoOff: false,
+            connectionQuality: 3,
+            avatar: null
+        }
+    ]
+    
+    // Generate a sample call ID
+    callId.value = 'CALL-' + Math.random().toString(36).substr(2, 9).toUpperCase()
 })
+
+// Professional Call Interface Methods
+const handleParticipantMute = (participant) => {
+    addTranscriptEntry('System', `Muted participant: ${participant.name}`)
+}
+
+const handleParticipantRemove = (participant) => {
+    participants.value = participants.value.filter(p => p.id !== participant.id)
+    addTranscriptEntry('System', `Removed participant: ${participant.name}`)
+}
+
+const toggleVideo = () => {
+    addTranscriptEntry('System', 'Video toggle requested')
+}
+
+const toggleShareScreen = () => {
+    addTranscriptEntry('System', 'Screen share toggle requested')
+}
+
+const toggleParticipants = () => {
+    addTranscriptEntry('System', 'Participants panel toggle requested')
+}
+
+const toggleChat = () => {
+    addTranscriptEntry('System', 'Chat panel toggle requested')
+}
+
+const toggleMoreOptions = () => {
+    addTranscriptEntry('System', 'More options menu requested')
+}
 
 onUnmounted(() => {
     if (callTimer) {

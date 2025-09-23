@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pusher Cluster Test</title>
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+</head>
+<body>
+    <h1>Pusher Cluster Test</h1>
+    <div id="results"></div>
+
+    <script>
+        const appKey = '0f11222c1334ac630b9c';
+        const clusters = ['mt1', 'us2', 'eu', 'ap-southeast-1', 'ap-northeast-1'];
+        const results = document.getElementById('results');
+
+        function testCluster(cluster) {
+            return new Promise((resolve) => {
+                const pusher = new Pusher(appKey, {
+                    cluster: cluster,
+                    forceTLS: true
+                });
+
+                const timeout = setTimeout(() => {
+                    pusher.disconnect();
+                    resolve({ cluster, status: 'timeout', error: 'Connection timeout' });
+                }, 5000);
+
+                pusher.connection.bind('connected', () => {
+                    clearTimeout(timeout);
+                    pusher.disconnect();
+                    resolve({ cluster, status: 'success', error: null });
+                });
+
+                pusher.connection.bind('error', (error) => {
+                    clearTimeout(timeout);
+                    pusher.disconnect();
+                    resolve({ cluster, status: 'error', error: error.message || error });
+                });
+            });
+        }
+
+        async function testAllClusters() {
+            results.innerHTML = '<p>Testing clusters...</p>';
+            
+            for (const cluster of clusters) {
+                const result = await testCluster(cluster);
+                const statusColor = result.status === 'success' ? 'green' : 'red';
+                results.innerHTML += `<p style="color: ${statusColor}">
+                    <strong>${cluster}:</strong> ${result.status} 
+                    ${result.error ? `(${result.error})` : ''}
+                </p>`;
+            }
+        }
+
+        testAllClusters();
+    </script>
+</body>
+</html>

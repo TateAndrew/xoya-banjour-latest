@@ -19,7 +19,7 @@ class WebhookController extends Controller
         Log::info('SMS Webhook received', $request->all());
 
         $data = $request->all();
-        
+
         if ($data['event_type'] === 'message.received') {
             $this->handleInboundSms($data['data']['payload']);
         }
@@ -35,12 +35,58 @@ class WebhookController extends Controller
         Log::info('DLR Webhook received', $request->all());
 
         $data = $request->all();
-        
+
         if ($data['event_type'] === 'message.delivered') {
             $this->processDeliveryReceipt($data['data']['payload']);
         }
 
         return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * Handle incoming call webhooks from Telnyx.
+     */
+    public function handleCallWebhook(Request $request)
+    {
+
+        $data = $request->all();
+        try {
+            $eventType = $data['data']['event_type'] ?? '';
+            $payload = $data['data']['payload'] ?? [];
+
+            // Create call log entry for every webhook event
+            $this->createCallLog($eventType, $payload, $data);
+
+            // Update call status based on event type
+            switch ($eventType) {
+                case 'call.initiated':
+                    $this->handleCallInitiated($payload);
+                    break;
+                case 'call.answered':
+                    $this->handleCallAnswered($payload);
+                    break;
+                case 'call.bridged':
+                    $this->handleCallBridged($payload);
+                    break;
+                case 'call.hangup':
+                    $this->handleCallHangup($payload);
+                    break;
+                case 'call.failed':
+                    $this->handleCallFailed($payload);
+                    break;
+                default:
+                    Log::info('Call webhook event logged', ['event_type' => $eventType]);
+            }
+
+            return response()->json(['status' => 'success']);
+        } catch (\Exception $e) {
+            Log::error('Error processing call webhook: ' . $e->getMessage(), [
+                'payload' => $data,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -125,7 +171,7 @@ class WebhookController extends Controller
             $status = $payload['status'];
 
             $message = Message::where('telnyx_message_id', $telnyxId)->first();
-            
+
             if ($message) {
                 $message->update([
                     'status' => $status,
@@ -143,7 +189,6 @@ class WebhookController extends Controller
                     'status' => $status
                 ]);
             }
-
         } catch (\Exception $e) {
             Log::error('Error processing delivery receipt: ' . $e->getMessage(), [
                 'payload' => $payload,
@@ -151,4 +196,270 @@ class WebhookController extends Controller
             ]);
         }
     }
+    /**
+     * Get call information by ID
+     */
+    public function getCall(Request $request)
+    {
+        try {
+            $callId = $request->input('call_id');
+
+            if (!$callId) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Call ID is required'
+                ], 400);
+            }
+
+            // Find the call in database
+            $call = \App\Models\Call::where("call_session_id", $callId)->first();
+
+            if (!$call) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Call not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'call' => $call
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error getting call: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to get call: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Create call log entry for every webhook event
+     */
+    private function createCallLog($eventType, $payload, $fullData)
+    {
+        try {
+            // First, find or create the call record
+            $call = null;
+            if (isset($payload['call_session_id'])) {
+                $call = \App\Models\Call::firstOrCreate(
+                    ['call_session_id' => $payload['call_session_id']],
+                    [
+                        'user_id' => 1, // Default user - you might want to determine this differently
+                        'from_number' => $payload['from'] ?? null,
+                        'to_number' => $payload['to'] ?? null,
+                        'status' => 'initiating',
+                        'direction' => $payload['direction'] ?? 'outgoing',
+                        'start_time' => $payload['start_time'] ?? now(),
+                        'call_control_id' => $payload['call_control_id'] ?? null,
+                        'call_leg_id' => $payload['call_leg_id'] ?? null,
+                        'connection_id' => $payload['connection_id'] ?? null,
+                        'calling_party_type' => $payload['calling_party_type'] ?? null,
+                        'state' => $payload['state'] ?? null,
+                        'from_sip_uri' => $payload['from_sip_uri'] ?? null,
+                        'to_sip_uri' => $payload['to_sip_uri'] ?? null,
+                        'custom_headers' => $payload['custom_headers'] ?? null,
+                        'client_state' => $payload['client_state'] ?? null,
+                        'metadata' => $payload // Save entire payload as JSON
+                    ]
+                );
+            }
+
+            // Create the call log entry
+            \App\Models\CallLog::create([
+                'call_id' => $call ? $call->id : null,
+                'call_session_id' => $payload['call_session_id'] ?? null,
+                'call_leg_id' => $payload['call_leg_id'] ?? null,
+                'event_type' => $eventType,
+                'event_id' => $fullData['data']['id'] ?? uniqid(), // Use Telnyx event ID or generate unique ID
+                'call_control_id' => $payload['call_control_id'] ?? null,
+                'connection_id' => $payload['connection_id'] ?? null,
+                'direction' => $payload['direction'] ?? null,
+                'calling_party_type' => $payload['calling_party_type'] ?? null,
+                'state' => $payload['state'] ?? null,
+                'from_number' => $payload['from'] ?? null,
+                'to_number' => $payload['to'] ?? null,
+                'from_sip_uri' => $payload['from_sip_uri'] ?? null,
+                'to_sip_uri' => $payload['to_sip_uri'] ?? null,
+                'start_time' => $payload['start_time'] ?? null,
+                'end_time' => $payload['end_time'] ?? null,
+                'hangup_cause' => $payload['hangup_cause'] ?? null,
+                'hangup_source' => $payload['hangup_source'] ?? null,
+                'sip_hangup_cause' => $payload['sip_hangup_cause'] ?? null,
+                'call_quality_stats' => $payload['call_quality_stats'] ?? null,
+                'custom_headers' => $payload['custom_headers'] ?? null,
+                'client_state' => $payload['client_state'] ?? null,
+                'raw_payload' => $payload,
+                'occurred_at' => $fullData['data']['occurred_at'] ?? $payload['start_time'] ?? now()
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error creating call log: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Handle call initiated webhook
+     */
+    private function handleCallInitiated($payload)
+    {
+        Log::info('Call initiated', $payload);
+
+        // Create or update call record
+        if (isset($payload['call_session_id'])) {
+            $call = \App\Models\Call::firstOrCreate(
+                ['call_session_id' => $payload['call_session_id']],
+                [
+                    'user_id' => 1, // Default user
+                    'from_number' => $payload['from'] ?? null,
+                    'to_number' => $payload['to'] ?? null,
+                    'status' => 'initiating',
+                    'direction' => $payload['direction'] ?? 'outgoing',
+                    'start_time' => $payload['start_time'] ?? now(),
+                    'call_control_id' => $payload['call_control_id'] ?? null,
+                    'call_leg_id' => $payload['call_leg_id'] ?? null,
+                    'connection_id' => $payload['connection_id'] ?? null,
+                    'calling_party_type' => $payload['calling_party_type'] ?? null,
+                    'state' => $payload['state'] ?? null,
+                    'from_sip_uri' => $payload['from_sip_uri'] ?? null,
+                    'to_sip_uri' => $payload['to_sip_uri'] ?? null,
+                    'custom_headers' => $payload['custom_headers'] ?? null,
+                    'client_state' => $payload['client_state'] ?? null,
+                    'metadata' => $payload // Save entire payload as JSON
+                ]
+            );
+        }
+    }
+
+    /**
+     * Handle call answered webhook
+     */
+    private function handleCallAnswered($payload)
+    {
+        Log::info('Call answered', $payload);
+
+        // Update call status
+        if (isset($payload['call_session_id'])) {
+            $call = \App\Models\Call::where('call_session_id', $payload['call_session_id'])->first();
+            if ($call) {
+                $call->update([
+                    'status' => 'answered',
+                    'answered_at' => $payload['start_time'] ?? now(),
+                    'call_control_id' => $payload['call_control_id'] ?? $call->call_control_id,
+                    'call_leg_id' => $payload['call_leg_id'] ?? $call->call_leg_id,
+                    'connection_id' => $payload['connection_id'] ?? $call->connection_id,
+                    'calling_party_type' => $payload['calling_party_type'] ?? $call->calling_party_type,
+                    'state' => $payload['state'] ?? $call->state,
+                    'from_sip_uri' => $payload['from_sip_uri'] ?? $call->from_sip_uri,
+                    'to_sip_uri' => $payload['to_sip_uri'] ?? $call->to_sip_uri,
+                    'custom_headers' => $payload['custom_headers'] ?? $call->custom_headers,
+                    'client_state' => $payload['client_state'] ?? $call->client_state,
+                    'metadata' => array_merge($call->metadata ?? [], $payload) // Merge with existing metadata
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Handle call hangup webhook
+     */
+    private function handleCallHangup($payload)
+    {
+        Log::info('Call hangup', $payload);
+
+        // Update call status and calculate duration
+        if (isset($payload['call_session_id'])) {
+            $call = \App\Models\Call::where('call_session_id', $payload['call_session_id'])->first();
+            if ($call) {
+                $startTime = $payload['start_time'] ?? $call->created_at;
+                $endTime = $payload['end_time'] ?? now();
+                $duration = strtotime($endTime) - strtotime($startTime);
+
+                $call->update([
+                    'status' => 'ended',
+                    'ended_at' => $endTime,
+                    'duration' => $duration,
+                    'call_control_id' => $payload['call_control_id'] ?? $call->call_control_id,
+                    'call_leg_id' => $payload['call_leg_id'] ?? $call->call_leg_id,
+                    'connection_id' => $payload['connection_id'] ?? $call->connection_id,
+                    'calling_party_type' => $payload['calling_party_type'] ?? $call->calling_party_type,
+                    'state' => $payload['state'] ?? $call->state,
+                    'from_sip_uri' => $payload['from_sip_uri'] ?? $call->from_sip_uri,
+                    'to_sip_uri' => $payload['to_sip_uri'] ?? $call->to_sip_uri,
+                    'custom_headers' => $payload['custom_headers'] ?? $call->custom_headers,
+                    'client_state' => $payload['client_state'] ?? $call->client_state,
+                    'hangup_cause' => $payload['hangup_cause'] ?? null,
+                    'hangup_source' => $payload['hangup_source'] ?? null,
+                    'sip_hangup_cause' => $payload['sip_hangup_cause'] ?? null,
+                    'call_quality_stats' => $payload['call_quality_stats'] ?? null,
+                    'metadata' => array_merge($call->metadata ?? [], $payload) // Merge with existing metadata
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Handle call bridged webhook
+     */
+    private function handleCallBridged($payload)
+    {
+        Log::info('Call bridged', $payload);
+
+        // Update call status to in_progress when bridged
+        if (isset($payload['call_session_id'])) {
+            $call = \App\Models\Call::where('call_session_id', $payload['call_session_id'])->first();
+            if ($call) {
+                $call->update([
+                    'status' => 'in_progress',
+                    'call_control_id' => $payload['call_control_id'] ?? $call->call_control_id,
+                    'call_leg_id' => $payload['call_leg_id'] ?? $call->call_leg_id,
+                    'connection_id' => $payload['connection_id'] ?? $call->connection_id,
+                    'calling_party_type' => $payload['calling_party_type'] ?? $call->calling_party_type,
+                    'state' => $payload['state'] ?? $call->state,
+                    'from_sip_uri' => $payload['from_sip_uri'] ?? $call->from_sip_uri,
+                    'to_sip_uri' => $payload['to_sip_uri'] ?? $call->to_sip_uri,
+                    'custom_headers' => $payload['custom_headers'] ?? $call->custom_headers,
+                    'client_state' => $payload['client_state'] ?? $call->client_state,
+                    'metadata' => array_merge($call->metadata ?? [], $payload) // Merge with existing metadata
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Handle call failed webhook
+     */
+    private function handleCallFailed($payload)
+    {
+        Log::info('Call failed', $payload);
+
+        // Update call status to failed
+        if (isset($payload['call_session_id'])) {
+            $call = \App\Models\Call::where('call_session_id', $payload['call_session_id'])->first();
+            if ($call) {
+                $call->update([
+                    'status' => 'failed',
+                    'ended_at' => $payload['end_time'] ?? now(),
+                    'call_control_id' => $payload['call_control_id'] ?? $call->call_control_id,
+                    'call_leg_id' => $payload['call_leg_id'] ?? $call->call_leg_id,
+                    'connection_id' => $payload['connection_id'] ?? $call->connection_id,
+                    'calling_party_type' => $payload['calling_party_type'] ?? $call->calling_party_type,
+                    'state' => $payload['state'] ?? $call->state,
+                    'from_sip_uri' => $payload['from_sip_uri'] ?? $call->from_sip_uri,
+                    'to_sip_uri' => $payload['to_sip_uri'] ?? $call->to_sip_uri,
+                    'custom_headers' => $payload['custom_headers'] ?? $call->custom_headers,
+                    'client_state' => $payload['client_state'] ?? $call->client_state,
+                    'hangup_cause' => $payload['hangup_cause'] ?? null,
+                    'hangup_source' => $payload['hangup_source'] ?? null,
+                    'sip_hangup_cause' => $payload['sip_hangup_cause'] ?? null,
+                    'call_quality_stats' => $payload['call_quality_stats'] ?? null,
+                    'metadata' => array_merge($call->metadata ?? [], $payload) // Merge with existing metadata
+                ]);
+            }
+        }
+    }
+
+
+    
 }

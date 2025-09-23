@@ -176,6 +176,8 @@ Route::middleware(['auth'])->group(function () {
 Route::post('/api/telnyx/webhook', [TelnyxController::class, 'webhook']);
 Route::post('/webhooks/telnyx/sms', [WebhookController::class, 'handleSmsWebhook']);
 Route::post('/webhooks/telnyx/dlr', [WebhookController::class, 'handleDeliveryReceipt']);
+Route::post('/webhook/call', [WebhookController::class, 'handleCallWebhook']);
+Route::get('/api/webhook/call', [WebhookController::class, 'getCall']);
 
 // Development/Testing route to simulate inbound SMS
 Route::post('/test/simulate-inbound-sms', function(Illuminate\Http\Request $request) {
