@@ -15,3 +15,12 @@ Broadcast::channel('call-transcription', function () {
 Broadcast::channel('call-transcription.{callControlId}', function ($user, $callControlId) {
     return true; // Public channel for specific call transcription
 });
+
+// Public call status channels (no authentication required)
+Broadcast::channel('call-status', function () {
+    return true; // Public channel - anyone can listen
+});
+
+Broadcast::channel('call-status.{callSessionId}', function ($user, $callSessionId) {
+    return true; // Public channel for specific call status
+});

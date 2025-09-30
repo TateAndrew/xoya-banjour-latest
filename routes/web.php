@@ -8,6 +8,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\MessagingProfileController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\DialerController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -169,6 +170,13 @@ Route::middleware(['auth'])->group(function () {
     
     // API endpoints for AJAX requests
     Route::get('/api/conversations', [SmsController::class, 'getConversations'])->name('api.conversations');
+    
+    // Call API endpoints (authenticated)
+    Route::get('/api/calls/{sessionId}', [DialerController::class, 'getCall']);
+    
+    // Transcription endpoints (authenticated)
+    Route::post('/api/transcription/start', [DialerController::class, 'startTranscription']);
+    Route::post('/api/transcription/stop', [DialerController::class, 'stopTranscription']);
 });
 
 
@@ -179,7 +187,29 @@ Route::post('/webhooks/telnyx/dlr', [WebhookController::class, 'handleDeliveryRe
 Route::post('/webhook/call', [WebhookController::class, 'handleCallWebhook']);
 Route::get('/api/webhook/call', [WebhookController::class, 'getCall']);
 
-// Development/Testing route to simulate inbound SMS
+// Development/Testing routes
+Route::post('/test/pusher', function() {
+    if (!app()->environment('local')) {
+        abort(404);
+    }
+    
+    // Test Pusher broadcasting
+    event(new \App\Events\CallStatusUpdated(
+        new \App\Models\Call([
+            'call_session_id' => 'test-session-' . time(),
+            'call_control_id' => 'test-control-' . time(),
+            'from_number' => '+1234567890',
+            'to_number' => '+0987654321',
+            'status' => 'test',
+            'direction' => 'outgoing'
+        ]),
+        'test',
+        'test.event'
+    ));
+    
+    return response()->json(['message' => 'Test event broadcasted']);
+})->middleware('throttle:10,1');
+
 Route::post('/test/simulate-inbound-sms', function(Illuminate\Http\Request $request) {
     if (!app()->environment('local')) {
         abort(404);

@@ -74,6 +74,9 @@ class WebhookController extends Controller
                 case 'call.failed':
                     $this->handleCallFailed($payload);
                     break;
+                case 'call.transcription':
+                    $this->handleCallTranscription($payload);
+                    break;
                 default:
                     Log::info('Call webhook event logged', ['event_type' => $eventType]);
             }
@@ -155,6 +158,119 @@ class WebhookController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Error processing inbound SMS: ' . $e->getMessage(), [
+                'payload' => $payload,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Handle call transcription webhook
+     */
+    private function handleCallTranscription($payload)
+    {
+        Log::info('Call transcription received', $payload);
+        
+        try {
+            // Find the call by call_session_id
+            $call = \App\Models\Call::where('call_session_id', $payload['call_session_id'])->first();
+            
+            if (!$call) {
+                Log::warning('Call not found for transcription', [
+                    'call_session_id' => $payload['call_session_id'],
+                    'call_control_id' => $payload['call_control_id']
+                ]);
+                return;
+            }
+
+            // Extract transcription data
+            $transcriptionData = $payload['transcription_data'] ?? [];
+            $transcript = $transcriptionData['transcript'] ?? '';
+            $confidence = $transcriptionData['confidence'] ?? null;
+            $isFinal = $transcriptionData['is_final'] ?? false;
+
+            // Find or create CallTranscript record
+            $callTranscript = \App\Models\CallTranscript::firstOrCreate(
+                [
+                    'call_id' => $call->id,
+                    'call_control_id' => $payload['call_control_id']
+                ],
+                [
+                    'status' => 'processing',
+                    'language' => 'en', // Default language
+                    'transcript_text' => '',
+                    'transcript_data' => [],
+                    'started_at' => now(),
+                    'metadata' => $payload
+                ]
+            );
+
+            // Update transcript with new data
+            if ($isFinal) {
+                // Final transcript - append to existing text
+                $existingText = $callTranscript->transcript_text ?? '';
+                $newText = $existingText ? $existingText . ' ' . $transcript : $transcript;
+                
+                $callTranscript->update([
+                    'transcript_text' => $newText,
+                    'transcript_data' => array_merge($callTranscript->transcript_data ?? [], [
+                        'final_segments' => array_merge($callTranscript->transcript_data['final_segments'] ?? [], [
+                            [
+                                'text' => $transcript,
+                                'confidence' => $confidence,
+                                'timestamp' => now()->toISOString(),
+                                'is_final' => true
+                            ]
+                        ])
+                    ]),
+                    'status' => 'processing' // Keep processing until call ends
+                ]);
+            } else {
+                // Interim transcript - store in interim data
+                $callTranscript->update([
+                    'transcript_data' => array_merge($callTranscript->transcript_data ?? [], [
+                        'interim_segments' => array_merge($callTranscript->transcript_data['interim_segments'] ?? [], [
+                            [
+                                'text' => $transcript,
+                                'confidence' => $confidence,
+                                'timestamp' => now()->toISOString(),
+                                'is_final' => false
+                            ]
+                        ])
+                    ])
+                ]);
+            }
+
+            // Update call record with transcription metadata
+            $call->update([
+                'metadata' => array_merge($call->metadata ?? [], [
+                    'transcription_active' => true,
+                    'last_transcription' => [
+                        'text' => $transcript,
+                        'confidence' => $confidence,
+                        'is_final' => $isFinal,
+                        'timestamp' => now()->toISOString()
+                    ]
+                ])
+            ]);
+
+            Log::info('Transcription processed successfully', [
+                'call_id' => $call->id,
+                'transcript_id' => $callTranscript->id,
+                'transcript_length' => strlen($transcript),
+                'confidence' => $confidence,
+                'is_final' => $isFinal
+            ]);
+
+            // Broadcast transcription update for real-time frontend updates
+            event(new \App\Events\TranscriptionUpdated($callTranscript, [
+                'transcript' => $transcript,
+                'confidence' => $confidence,
+                'is_final' => $isFinal
+            ]));
+
+        } catch (\Exception $e) {
+            Log::error('Error processing transcription: ' . $e->getMessage(), [
                 'payload' => $payload,
                 'error' => $e->getMessage()
             ]);
@@ -329,6 +445,9 @@ class WebhookController extends Controller
                     'metadata' => $payload // Save entire payload as JSON
                 ]
             );
+
+            // Broadcast call status update
+            event(new \App\Events\CallStatusUpdated($call, 'initiating', 'call.initiated'));
         }
     }
 
@@ -357,6 +476,9 @@ class WebhookController extends Controller
                     'client_state' => $payload['client_state'] ?? $call->client_state,
                     'metadata' => array_merge($call->metadata ?? [], $payload) // Merge with existing metadata
                 ]);
+
+                // Broadcast call status update
+                event(new \App\Events\CallStatusUpdated($call, 'answered', 'call.answered'));
             }
         }
     }
@@ -395,6 +517,25 @@ class WebhookController extends Controller
                     'call_quality_stats' => $payload['call_quality_stats'] ?? null,
                     'metadata' => array_merge($call->metadata ?? [], $payload) // Merge with existing metadata
                 ]);
+
+                // Mark transcription as completed if it exists
+                $callTranscript = \App\Models\CallTranscript::where('call_id', $call->id)->first();
+                if ($callTranscript) {
+                    $callTranscript->update([
+                        'status' => 'completed',
+                        'completed_at' => $endTime,
+                        'duration' => $duration
+                    ]);
+                    
+                    Log::info('Transcription marked as completed', [
+                        'call_id' => $call->id,
+                        'transcript_id' => $callTranscript->id,
+                        'duration' => $duration
+                    ]);
+                }
+
+                // Broadcast call status update
+                event(new \App\Events\CallStatusUpdated($call, 'ended', 'call.hangup'));
             }
         }
     }
@@ -423,6 +564,9 @@ class WebhookController extends Controller
                     'client_state' => $payload['client_state'] ?? $call->client_state,
                     'metadata' => array_merge($call->metadata ?? [], $payload) // Merge with existing metadata
                 ]);
+
+                // Broadcast call status update
+                event(new \App\Events\CallStatusUpdated($call, 'in_progress', 'call.bridged'));
             }
         }
     }
@@ -456,10 +600,11 @@ class WebhookController extends Controller
                     'call_quality_stats' => $payload['call_quality_stats'] ?? null,
                     'metadata' => array_merge($call->metadata ?? [], $payload) // Merge with existing metadata
                 ]);
+
+                // Broadcast call status update
+                event(new \App\Events\CallStatusUpdated($call, 'failed', 'call.failed'));
             }
         }
     }
 
-
-    
 }

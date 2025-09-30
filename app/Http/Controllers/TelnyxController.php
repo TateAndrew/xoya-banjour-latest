@@ -320,9 +320,6 @@ class TelnyxController extends Controller
         }
     }
 
-    /**
-     * List available connections from Telnyx API (fallback)
-     */
     public function listTelnyxConnections()
     {
         try {

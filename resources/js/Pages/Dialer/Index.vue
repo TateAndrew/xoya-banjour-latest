@@ -37,6 +37,25 @@
                                          :class="callDirection === 'incoming' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'">
                                         {{ callDirection === 'incoming' ? '📞 Incoming Call' : '📞 Outgoing Call' }}
                                     </div>
+                                    
+                                    <!-- Dialer Number Display -->
+                                    <div v-if="fromNumber" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <div class="text-sm text-blue-600 font-medium mb-1">Dialer Number</div>
+                                        <div class="text-lg font-bold text-blue-800">{{ fromNumber }}</div>
+                                    </div>
+                                    
+                                    <!-- Incoming Call Number Display -->
+                                    <div v-if="isIncomingCall && toNumber" class="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                        <div class="text-sm text-green-600 font-medium mb-1">Incoming From</div>
+                                        <div class="text-lg font-bold text-green-800">{{ toNumber }}</div>
+                                    </div>
+                                    
+                                    <!-- Outgoing Call Number Display -->
+                                    <div v-if="!isIncomingCall && toNumber && (isCallActive || isRinging || isConnecting)" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <div class="text-sm text-blue-600 font-medium mb-1">Calling To</div>
+                                        <div class="text-lg font-bold text-blue-800">{{ toNumber }}</div>
+                                    </div>
+                                    
                                     <p v-if="callDuration" class="text-3xl font-mono text-blue-600 font-bold tracking-wider">{{ callDuration }}</p>
                                     
                                     <!-- Debug Information -->
@@ -54,6 +73,19 @@
                                         <div>Show Active Buttons: {{ isCallActive }}</div>
                                     </div>
                                 </div>
+                                <!-- Caller Information Section -->
+                                <div v-if="isIncomingCall && toNumber" class="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4 mb-4">
+                                    <div class="text-center">
+                                        <div class="w-16 h-16 mx-auto mb-3 bg-green-600 rounded-full flex items-center justify-center">
+                                            <span class="text-white text-2xl">📞</span>
+                                        </div>
+                                        <h4 class="text-lg font-bold text-green-800 mb-1">Incoming Call</h4>
+                                        <div class="text-2xl font-bold text-green-900 mb-2">{{ toNumber }}</div>
+                                        <div class="text-sm text-green-600">Calling your dialer number</div>
+                                        <div class="text-xs text-green-500 mt-1">{{ fromNumber }}</div>
+                                    </div>
+                                </div>
+
                                 <div  class="space-y-4">
                                         <!-- Incoming Call Buttons: Answer and Decline for incoming calls -->
                                         <template v-if="isIncomingCall && !isCallActive">
@@ -408,6 +440,21 @@
                                     <div class="flex items-center justify-center space-x-2">
                                         <span class="text-xl">{{ callStatusIcon }}</span>
                                         <span class="font-semibold">{{ callStatusText }}</span>
+                                    </div>
+                                    
+                                    <!-- Call Numbers Display -->
+                                    <div v-if="(isCallActive || isRinging || isConnecting) && (fromNumber || toNumber)" 
+                                         class="mt-3 pt-3 border-t border-gray-200">
+                                        <div class="space-y-2 text-sm">
+                                            <div v-if="fromNumber" class="flex items-center justify-center space-x-2">
+                                                <span class="text-gray-600">From:</span>
+                                                <span class="font-medium text-gray-800">{{ fromNumber }}</span>
+                                            </div>
+                                            <div v-if="toNumber" class="flex items-center justify-center space-x-2">
+                                                <span class="text-gray-600">{{ isIncomingCall ? 'Caller:' : 'To:' }}</span>
+                                                <span class="font-medium text-gray-800">{{ toNumber }}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                     
                                     <!-- Call Quality Indicator (for active calls) -->
@@ -817,14 +864,14 @@ const onConnectionChange = async () => {
             // Auto-select the first phone number if available
             if (connectionPhoneNumbers.value.length > 0) {
                 fromNumber.value = connectionPhoneNumbers.value[0].phone_number
-                addTranscriptEntry('System', `SIP connection changed to: ${selectedConnectionData.value.name}`)
+                //addTranscriptEntry('System', `SIP connection changed to: ${selectedConnectionData.value.name}`)
             } else {
                 fromNumber.value = ''
-                addTranscriptEntry('System', `SIP connection changed to: ${selectedConnectionData.value.name} - no phone numbers assigned`)
+                //addTranscriptEntry('System', `SIP connection changed to: ${selectedConnectionData.value.name} - no phone numbers assigned`)
             }
             
             // Automatically initialize WebRTC with the selected connection
-            addTranscriptEntry('System', 'Initializing WebRTC with selected connection...')
+            // addTranscriptEntry('System', 'Initializing WebRTC with selected connection...')
             webrtcStatus.value = 'connecting'
             await initializeWebRTC()
         }
@@ -912,7 +959,7 @@ const initializeWebRTC = async () => {
             video: false,
             debug: false // Disable debug mode for production
         })
-        addTranscriptEntry('System', `WebRTC initialized with SIP connection: ${selectedConnectionData.value.name}`)
+        // addTranscriptEntry('System', `WebRTC initialized with SIP connection: ${selectedConnectionData.value.name}`)
 
         // Set remote audio element
         webrtcClient.remoteElement = 'remoteMedia'
@@ -920,7 +967,7 @@ const initializeWebRTC = async () => {
         // Event listeners
         webrtcClient.on('telnyx.ready', () => {
             webrtcStatus.value = 'ready'
-            addTranscriptEntry('System', 'WebRTC client initialized and ready for calls')
+            // addTranscriptEntry('System', 'WebRTC client initialized and ready for calls')
         })
 
         webrtcClient.on('telnyx.error', (error) => {
@@ -938,7 +985,11 @@ const initializeWebRTC = async () => {
             
             // Handle incoming calls - official way according to docs
             if (notification.type === 'callUpdate' && notification.call.state === 'ringing') {
-                const callerNumber = notification.call.params?.caller_id_number || 'Unknown'
+                // Extract caller number from call.options first, then fallback to call.params
+                const callerNumber = notification.call.options?.callerNumber || 
+                                   notification.call.options?.remoteCallerNumber || 
+                                   notification.call.params?.caller_id_number || 
+                                   'Unknown'
                 addTranscriptEntry('System', `📞 Incoming call from ${callerNumber}`)
                 showCallNotification('📞 Incoming Call', `Call from ${callerNumber}`, 'info')
                 handleIncomingCall(notification.call)
@@ -961,7 +1012,6 @@ const initializeWebRTC = async () => {
 
 // Handle incoming calls
 const handleIncomingCall = (call) => {
-    
     try {
         currentCall = call
         callStatus.value = 'ringing'
@@ -970,17 +1020,43 @@ const handleIncomingCall = (call) => {
         isIncomingCall.value = true // Mark as incoming call
         callDirection.value = 'incoming'
         
-        // Extract caller information from the call object
-        if (call && call.params) {
-            if (call.params.caller_id_number) {
-                toNumber.value = call.params.caller_id_number // Set the caller's number as the "to" number for display
+        // Extract caller information from the call.options object
+        if (call && call.options) {
+            // For incoming calls:
+            // - callerNumber: The number calling us (incoming caller)
+            // - destinationNumber: Our number that they called
+            // - remoteCallerNumber: Also the incoming caller's number
+            // - remoteCallerName: The caller's name if available
+            
+            if (call.options.callerNumber || call.options.remoteCallerNumber) {
+                toNumber.value = call.options.callerNumber || call.options.remoteCallerNumber
             }
-            if (call.params.destination_number) {
-                fromNumber.value = call.params.destination_number // The number they called
+            
+            if (call.options.destinationNumber) {
+                fromNumber.value = call.options.destinationNumber
+            }
+            
+            // Log the call options for debugging
+            addTranscriptEntry('Debug', `Call options: ${JSON.stringify({
+                callerNumber: call.options.callerNumber,
+                destinationNumber: call.options.destinationNumber,
+                remoteCallerNumber: call.options.remoteCallerNumber,
+                remoteCallerName: call.options.remoteCallerName,
+                telnyxSessionId: call.options.telnyxSessionId
+            })}`)
+        }
+        
+        // Fallback to call.params if options are not available
+        if (call && call.params && !toNumber.value) {
+            if (call.params.caller_id_number) {
+                toNumber.value = call.params.caller_id_number
+            }
+            if (call.params.destination_number && !fromNumber.value) {
+                fromNumber.value = call.params.destination_number
             }
         }
         
-        addTranscriptEntry('Call', `Incoming call received from ${toNumber.value || 'Unknown'}`)
+        addTranscriptEntry('Call', `Incoming call received from ${toNumber.value || 'Unknown'} to ${fromNumber.value || 'Unknown'}`)
         addTranscriptEntry('Debug', `Call flags: incoming=${isIncomingCall.value}, ringing=${isRinging.value}, active=${isCallActive.value}`)
         
         // Set up call event listeners for incoming call
@@ -1384,14 +1460,13 @@ const endCall = (skipHangup = false) => {
 // Toggle transcription for the current call
 const toggleTranscription = async () => {
     try {
-
-        
         if (!currentCall || !currentCall.options.telnyxSessionId) {
             addTranscriptEntry('System', 'No active call to transcribe')
             return
         }
         // Fetch call details from database to get call_control_id
         const callResponse = await fetch(`/api/calls/${currentCall.options.telnyxSessionId}`)
+        
         const callData = await callResponse.json()
         
         if (!callData.success || !callData.data.call_control_id) {
@@ -1432,6 +1507,7 @@ const toggleTranscription = async () => {
                 },
                 body: JSON.stringify({
                     call_control_id: callControlId,
+                    call_id: currentCall.options.telnyxSessionId,
                     language: 'en',
                     transcription_engine: 'B'
                 })
@@ -1520,8 +1596,31 @@ onMounted(() => {
                     alert(`Transcription completed: ${e.latest_transcript}`)
                 }
             })
+
+        // Listen for call status updates
+        window.Echo.channel('call-status')
+            .listen('.call.status.updated', (e) => {
+                console.log('Received call status update:', e)
+                
+                // Update call status in UI
+                if (currentCall.value && currentCall.value.options.telnyxSessionId === e.call_session_id) {
+                    // Update current call status
+                    currentCall.value.status = e.status
+                    
+                    // Add status update to transcript
+                    addTranscriptEntry('System', `Call status: ${e.status} (${e.event_type})`)
+                    
+                    // Handle specific status changes
+                    if (e.status === 'ended' || e.status === 'failed') {
+                        // Call ended - cleanup
+                        setTimeout(() => {
+                            endCall()
+                        }, 1000)
+                    }
+                }
+            })
     } else {
-        console.warn('Laravel Echo not available for real-time transcription updates')
+        console.warn('Laravel Echo not available for real-time updates')
     }
     
     // Initialize sample participants for demo

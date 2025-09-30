@@ -7,16 +7,19 @@ use Inertia\Inertia;
 use App\Models\PhoneNumber;
 use App\Models\User;
 use App\Services\TelynxService;
+use App\Services\TranscriptionService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class DialerController extends Controller
 {
     protected $telnyxService;
+    protected $transcriptionService;
 
-    public function __construct(TelynxService $telnyxService)
+    public function __construct(TelynxService $telnyxService, TranscriptionService $transcriptionService)
     {
         $this->telnyxService = $telnyxService;
+        $this->transcriptionService = $transcriptionService;
     }
 
     /**
@@ -216,5 +219,169 @@ class DialerController extends Controller
     private function generateConferenceId()
     {
         return 'conf_' . uniqid() . '_' . time();
+    }
+
+    /**
+     * Start transcription for a call
+     */
+    public function startTranscription(Request $request)
+    {
+        $request->validate([
+            'call_control_id' => 'required|string',
+            'language' => 'sometimes|string|in:en,es,fr,de,it,pt,ru,ja,ko,zh',
+            'transcription_engine' => 'sometimes|string|in:A,B'
+        ]);
+
+        try {
+            $callControlId = $request->input('call_control_id');
+            $language = $request->input('language', 'en');
+            $transcriptionEngine = $request->input('transcription_engine', 'B');
+
+            // Start transcription using TranscriptionService
+            $clientState = base64_encode('transcription_started_' . time() . '_' . $callControlId);
+            
+            Log::info('Starting transcription with client_state', [
+                'call_control_id' => $callControlId,
+                'client_state_raw' => 'transcription_started_' . time() . '_' . $callControlId,
+                'client_state_encoded' => $clientState,
+                'language' => $language,
+                'engine' => $transcriptionEngine
+            ]);
+            
+            $transcript = $this->transcriptionService->startTranscription(
+                $callControlId,
+                $language,
+                [
+                    'transcription_engine' => $transcriptionEngine,
+                    'client_state' => $clientState
+                ]
+            );
+
+            if ($transcript) {
+                Log::info('Transcription started successfully', [
+                    'call_control_id' => $callControlId,
+                    'transcript_id' => $transcript->id,
+                    'language' => $language,
+                    'engine' => $transcriptionEngine
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Transcription started successfully',
+                    'transcript' => [
+                        'id' => $transcript->id,
+                        'status' => $transcript->status,
+                        'language' => $transcript->language,
+                        'started_at' => $transcript->started_at
+                    ]
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to start transcription'
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error starting transcription: ' . $e->getMessage(), [
+                'call_control_id' => $request->input('call_control_id'),
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to start transcription: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get call details by session ID
+     */
+    public function getCall(Request $request, $sessionId)
+    {
+        try {
+            $call = \App\Models\Call::where('call_session_id', $sessionId)->first();
+            
+            if (!$call) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Call not found'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $call->id,
+                    'call_session_id' => $call->call_session_id,
+                    'call_control_id' => $call->call_control_id,
+                    'from_number' => $call->from_number,
+                    'to_number' => $call->to_number,
+                    'status' => $call->status,
+                    'direction' => $call->direction,
+                    'start_time' => $call->start_time,
+                    'answered_at' => $call->answered_at,
+                    'ended_at' => $call->ended_at,
+                    'duration' => $call->duration,
+                    'metadata' => $call->metadata
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error getting call details: ' . $e->getMessage(), [
+                'session_id' => $sessionId,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get call details: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Stop transcription for a call
+     */
+    public function stopTranscription(Request $request)
+    {
+        $request->validate([
+            'call_control_id' => 'required|string'
+        ]);
+
+        try {
+            $callControlId = $request->input('call_control_id');
+
+            // Stop transcription using TranscriptionService
+            $success = $this->transcriptionService->stopTranscription($callControlId);
+
+            if ($success) {
+                Log::info('Transcription stopped successfully', [
+                    'call_control_id' => $callControlId
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Transcription stopped successfully'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to stop transcription'
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error stopping transcription: ' . $e->getMessage(), [
+                'call_control_id' => $request->input('call_control_id'),
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to stop transcription: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
