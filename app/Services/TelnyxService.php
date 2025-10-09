@@ -74,12 +74,13 @@ class TelnyxService
                 'status' => $response['data']['to'][0]['status'] ?? 'unknown'
             ]);
             
-            return $response;
+            return ['success' => true, 'data' => $response];
             
         } catch (\Telnyx\Exception\ApiErrorException $e) {
+            $errorMessage = $e->getMessage();
             Log::error('Telnyx API error while sending SMS', [
                 'error_type' => 'ApiErrorException',
-                'message' => $e->getMessage(),
+                'message' => $errorMessage,
                 'to' => $toNumber ?? $to,
                 'from' => $fromNumber ?? $from,
                 'messaging_profile_id' => $messagingProfileId,
@@ -87,38 +88,41 @@ class TelnyxService
                 'error_code' => method_exists($e, 'getTelnyxCode') ? $e->getTelnyxCode() : null,
                 'trace' => $e->getTraceAsString()
             ]);
-            return null;
+            return ['success' => false, 'error' => $errorMessage];
             
         } catch (\Telnyx\Exception\InvalidRequestException $e) {
+            $errorMessage = $e->getMessage();
             Log::error('Invalid request error while sending SMS', [
                 'error_type' => 'InvalidRequestException',
-                'message' => $e->getMessage(),
+                'message' => $errorMessage,
                 'to' => $toNumber ?? $to,
                 'from' => $fromNumber ?? $from,
                 'messaging_profile_id' => $messagingProfileId,
                 'trace' => $e->getTraceAsString()
             ]);
-            return null;
+            return ['success' => false, 'error' => $errorMessage];
             
         } catch (\Telnyx\Exception\AuthenticationException $e) {
+            $errorMessage = $e->getMessage();
             Log::error('Authentication error while sending SMS', [
                 'error_type' => 'AuthenticationException',
-                'message' => $e->getMessage(),
+                'message' => $errorMessage,
                 'to' => $toNumber ?? $to,
                 'trace' => $e->getTraceAsString()
             ]);
-            return null;
+            return ['success' => false, 'error' => $errorMessage];
             
         } catch (\Exception $e) {
+            $errorMessage = $e->getMessage();
             Log::error('Unexpected error while sending SMS', [
                 'error_type' => get_class($e),
-                'message' => $e->getMessage(),
+                'message' => $errorMessage,
                 'to' => $toNumber ?? $to,
                 'from' => $fromNumber ?? $from,
                 'messaging_profile_id' => $messagingProfileId,
                 'trace' => $e->getTraceAsString()
             ]);
-            return null;
+            return ['success' => false, 'error' => $errorMessage];
         }
     }
 

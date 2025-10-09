@@ -291,9 +291,9 @@ class SmsController extends Controller
                     $phoneNumber->messagingProfile->telnyx_profile_id
                 );
                 
-                if ($response && isset($response['data']['id'])) {
+                if ($response && $response['success'] && isset($response['data']['data']['id'])) {
                     $message->update([
-                        'telnyx_message_id' => $response['data']['id'],
+                        'telnyx_message_id' => $response['data']['data']['id'],
                         'status' => Message::STATUS_SENDING
                     ]);
                 } else {
@@ -302,9 +302,13 @@ class SmsController extends Controller
                         'status' => Message::STATUS_FAILED
                     ]);
                     
+                    $errorMessage = isset($response['error']) 
+                        ? 'Failed to send message: ' . $response['error']
+                        : 'Failed to send message. Invalid response from Telnyx.';
+                    
                     return response()->json([
                         'success' => false,
-                        'message' => 'Failed to send message. Invalid response from Telnyx.'
+                        'message' => $errorMessage
                     ], 500);
                 }
             }
@@ -505,9 +509,9 @@ class SmsController extends Controller
                     $phoneNumber->messagingProfile->telnyx_profile_id
                 );
 
-                if ($response && isset($response['data']['id'])) {
+                if ($response && $response['success'] && isset($response['data']['data']['id'])) {
                     $message->update([
-                        'telnyx_message_id' => $response['data']['id'],
+                        'telnyx_message_id' => $response['data']['data']['id'],
                         'status' => Message::STATUS_SENDING
                     ]);
                 } else {
@@ -516,9 +520,13 @@ class SmsController extends Controller
                         'status' => Message::STATUS_FAILED
                     ]);
                     
+                    $errorMessage = isset($response['error']) 
+                        ? 'Failed to send message: ' . $response['error']
+                        : 'Failed to send message. Invalid response from Telnyx.';
+                    
                     return response()->json([
                         'success' => false,
-                        'message' => 'Failed to send message. Invalid response from Telnyx.'
+                        'message' => $errorMessage
                     ], 500);
                 }
             }
