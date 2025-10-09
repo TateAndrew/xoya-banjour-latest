@@ -19,7 +19,6 @@ class WebhookController extends Controller
     public function handleSmsWebhook(Request $request)
     {
         try {
-            Log::info('SMS Webhook received', $request->all());
 
             $data = $request->all();
             $eventType = $data['data']['event_type'] ?? $data['event_type'] ?? null;
@@ -226,7 +225,6 @@ class WebhookController extends Controller
             $content = $payload['text'] ?? '';
             $status = $payload['to'][0]['status'] ?? 'sent';
             $completedAt = $payload['completed_at'] ?? now();
-
             Log::info('Processing message.finalized', [
                 'direction' => $direction,
                 'from' => $from,
@@ -266,7 +264,8 @@ class WebhookController extends Controller
 
                     // Broadcast message status update
                     // event(new \App\Events\MessageSent($message));
-                } else {
+                } 
+                else {
                     Log::warning('Message.finalized received for unknown outbound message', [
                         'telnyx_id' => $telnyxId,
                         'from' => $from,
