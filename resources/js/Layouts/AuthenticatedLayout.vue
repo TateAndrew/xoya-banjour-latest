@@ -127,6 +127,50 @@ const showingNavigationDropdown = ref(false);
                                 >
                                     Users
                                 </NavLink>
+                                
+                                <!-- Administration Dropdown -->
+                                <div class="hidden sm:flex sm:items-center sm:ms-6 relative">
+                                    <Dropdown align="left" width="48">
+                                        <template #trigger>
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none"
+                                                :class="route().current('roles.*') || route().current('permissions.*') 
+                                                    ? 'border-indigo-400 text-gray-900 focus:border-indigo-700' 
+                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:text-gray-700 focus:border-gray-300'"
+                                            >
+                                                🔐 Admin
+                                                <svg
+                                                    class="ms-2 -me-0.5 h-4 w-4"
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 20 20"
+                                                    fill="currentColor"
+                                                >
+                                                    <path
+                                                        fill-rule="evenodd"
+                                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                        clip-rule="evenodd"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        </template>
+
+                                        <template #content>
+                                            <DropdownLink :href="route('roles.index')">
+                                                <div class="flex items-center space-x-2">
+                                                    <span>👥</span>
+                                                    <span>Roles</span>
+                                                </div>
+                                            </DropdownLink>
+                                            <DropdownLink :href="route('permissions.index')">
+                                                <div class="flex items-center space-x-2">
+                                                    <span>🔑</span>
+                                                    <span>Permissions</span>
+                                                </div>
+                                            </DropdownLink>
+                                        </template>
+                                    </Dropdown>
+                                </div>
                             </div>
                         </div>
 
@@ -298,6 +342,27 @@ const showingNavigationDropdown = ref(false);
                             :active="route().current('users.*')"
                         >
                             Users
+                        </ResponsiveNavLink>
+                        
+                        <!-- Administration Section -->
+                        <div class="px-4 py-2">
+                            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                🔐 Administration
+                            </div>
+                        </div>
+                        <ResponsiveNavLink
+                            :href="route('roles.index')"
+                            :active="route().current('roles.*')"
+                            class="pl-8"
+                        >
+                            👥 Roles
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('permissions.index')"
+                            :active="route().current('permissions.*')"
+                            class="pl-8"
+                        >
+                            🔑 Permissions
                         </ResponsiveNavLink>
                     </div>
 

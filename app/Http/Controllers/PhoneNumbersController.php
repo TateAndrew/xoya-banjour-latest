@@ -131,7 +131,6 @@ class PhoneNumbersController extends Controller
             'city' => 'nullable|string',
             'state' => 'nullable|string'
         ]);
-
         try {
             // First, check if the number is still available
             $searchResult = $this->telnyxService->searchNumbers([
@@ -140,7 +139,6 @@ class PhoneNumbersController extends Controller
                 'features' => $request->features,
                 'limit' => 100
             ]);
-
             if (!$searchResult['success']) {
                 return response()->json([
                     'success' => false,
@@ -150,15 +148,14 @@ class PhoneNumbersController extends Controller
 
             // Check if the specific number is still available
             $availableNumbers = collect($searchResult['data']);
+          
             $targetNumber = $availableNumbers->firstWhere('phone_number', $request->phone_number);
-
             if (!$targetNumber) {
                 return response()->json([
                     'success' => false,
                     'error' => 'This phone number is no longer available.'
                 ], 400);
             }
-
             // Purchase the number through Telnyx
             $purchaseResult = $this->telnyxService->purchaseNumber($request->phone_number, [
                 'country_code' => $request->country_code,

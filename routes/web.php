@@ -13,6 +13,8 @@ use App\Http\Controllers\RecordingController;
 use App\Http\Controllers\TranscriptionController;
 use App\Http\Controllers\OutboundVoiceProfileController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\PermissionController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -128,10 +130,17 @@ Route::middleware('auth')->group(function () {
     })->name('test-validation');
 });
 
-// User Management Routes
+// User Management Routes       
 Route::middleware('auth')->group(function () {
     Route::resource('users', UserController::class);
     Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    
+    // Role and Permission assignment routes
+    Route::post('/users/{user}/assign-role', [UserController::class, 'assignRole'])->name('users.assign-role');
+    Route::post('/users/{user}/remove-role', [UserController::class, 'removeRole'])->name('users.remove-role');
+    Route::post('/users/{user}/sync-roles', [UserController::class, 'syncRoles'])->name('users.sync-roles');
+    Route::post('/users/{user}/give-permission', [UserController::class, 'givePermission'])->name('users.give-permission');
+    Route::post('/users/{user}/revoke-permission', [UserController::class, 'revokePermission'])->name('users.revoke-permission');
     
     // Phone number assignment routes
     Route::post('/users/{user}/assign-phone-number', [UserController::class, 'assignPhoneNumber'])->name('users.assign-phone-number');
@@ -142,6 +151,17 @@ Route::middleware('auth')->group(function () {
     // Phone number details routes
     Route::get('/api/telnyx-number-details', [UserController::class, 'getTelnyxNumberDetails'])->name('users.telnyx-number-details');
     Route::get('/users/{user}/phone-number-usage', [UserController::class, 'getPhoneNumberUsage'])->name('users.phone-number-usage');
+});
+
+// Role Management Routes
+Route::middleware('auth')->group(function () {
+    Route::resource('roles', RoleController::class);
+    Route::post('/roles/{role}/assign-permissions', [RoleController::class, 'assignPermissions'])->name('roles.assign-permissions');
+});
+
+// Permission Management Routes
+Route::middleware('auth')->group(function () {
+    Route::resource('permissions', PermissionController::class);
 });
 
 // Messaging Profile Routes

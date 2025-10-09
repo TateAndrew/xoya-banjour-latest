@@ -228,6 +228,77 @@ class UserController extends Controller
     }
 
     /**
+     * Assign role to user
+     */
+    public function assignRole(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'role' => 'required|exists:roles,name'
+        ]);
+
+        $user->assignRole($validated['role']);
+
+        return back()->with('success', 'Role assigned successfully.');
+    }
+
+    /**
+     * Remove role from user
+     */
+    public function removeRole(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'role' => 'required|exists:roles,name'
+        ]);
+
+        $user->removeRole($validated['role']);
+
+        return back()->with('success', 'Role removed successfully.');
+    }
+
+    /**
+     * Sync user roles
+     */
+    public function syncRoles(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'roles' => 'required|array',
+            'roles.*' => 'exists:roles,name'
+        ]);
+
+        $user->syncRoles($validated['roles']);
+
+        return back()->with('success', 'User roles updated successfully.');
+    }
+
+    /**
+     * Give permission to user
+     */
+    public function givePermission(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'permission' => 'required|exists:permissions,name'
+        ]);
+
+        $user->givePermissionTo($validated['permission']);
+
+        return back()->with('success', 'Permission assigned successfully.');
+    }
+
+    /**
+     * Revoke permission from user
+     */
+    public function revokePermission(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'permission' => 'required|exists:permissions,name'
+        ]);
+
+        $user->revokePermissionTo($validated['permission']);
+
+        return back()->with('success', 'Permission revoked successfully.');
+    }
+
+    /**
      * Assign a Telnyx phone number to user
      */
     public function assignPhoneNumber(Request $request, User $user)
