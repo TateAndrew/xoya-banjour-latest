@@ -451,6 +451,21 @@
                                     </div>
                                 </div>
 
+                                <!-- Error Display -->
+                                <div v-if="lastError" class="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <div class="flex items-start space-x-2">
+                                        <span class="text-red-600 text-lg">⚠️</span>
+                                        <div class="flex-1">
+                                            <h4 class="text-sm font-semibold text-red-900 mb-1">Error</h4>
+                                            <p class="text-xs text-red-700 break-words">{{ lastError }}</p>
+                                            <button @click="lastError = ''" 
+                                                    class="mt-2 text-xs text-red-600 hover:text-red-800 underline">
+                                                Dismiss
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Quick Actions -->
                                 <div class="space-y-3">
                                     <!-- <button @click="loadConnections" 
@@ -971,9 +986,14 @@ const getCurrentConnectionCredentials = () => {
 
 // Initialize WebRTC
 const initializeWebRTC = async () => {
+    console.log('🚀 initializeWebRTC called')
+    console.log('🚀 Selected connection:', selectedConnection.value)
+    console.log('🚀 Selected connection data:', selectedConnectionData.value)
+    
     try {
         // Disconnect existing client if any
         if (webrtcClient) {
+            console.log('🔌 Disconnecting existing WebRTC client...')
             webrtcClient.disconnect()
             webrtcClient = null
         }
@@ -982,6 +1002,7 @@ const initializeWebRTC = async () => {
         if (!selectedConnection.value) {
             throw new Error('Please select a SIP connection first')
         }
+        console.log('✅ Connection selected, proceeding...')
 
         // Request notification permission
         if ('Notification' in window && Notification.permission === 'default') {
@@ -998,43 +1019,107 @@ const initializeWebRTC = async () => {
         } catch (mediaError) {
         }
 
+        // Import Telnyx WebRTC module
+        console.log('📦 Importing Telnyx WebRTC module...')
         const telnyxModule = await import('@telnyx/webrtc')
-        const TelnyxRTC = telnyxModule.default || telnyxModule.TelnyxRTC || telnyxModule
-
+        console.log('📦 Telnyx module imported:', telnyxModule)
+        console.log('📦 Module keys:', Object.keys(telnyxModule))
+        console.log('📦 Module.default:', telnyxModule.default)
+        console.log('📦 Module.TelnyxRTC:', telnyxModule.TelnyxRTC)
+        
+        // Handle different module export formats (same as Pusher fix)
+        let TelnyxRTC
+        
+        // Check if it's a module namespace object (Vite production build)
+        if (telnyxModule.default && typeof telnyxModule.default === 'function') {
+            // ESM default export
+            TelnyxRTC = telnyxModule.default
+            console.log('📦 Using telnyxModule.default')
+        } else if (telnyxModule.TelnyxRTC && typeof telnyxModule.TelnyxRTC === 'function') {
+            // Named export
+            TelnyxRTC = telnyxModule.TelnyxRTC
+            console.log('📦 Using telnyxModule.TelnyxRTC')
+        } else if (typeof telnyxModule === 'function') {
+            // CommonJS or direct function export
+            TelnyxRTC = telnyxModule
+            console.log('📦 Using telnyxModule directly')
+        } else {
+            // Try to find the constructor in the module
+            const constructorKey = Object.keys(telnyxModule).find(key => 
+                typeof telnyxModule[key] === 'function' && key.includes('Telnyx')
+            )
+            if (constructorKey) {
+                TelnyxRTC = telnyxModule[constructorKey]
+                console.log(`📦 Using telnyxModule.${constructorKey}`)
+            }
+        }
+        
+        console.log('📦 TelnyxRTC constructor:', TelnyxRTC)
+        console.log('📦 TelnyxRTC type:', typeof TelnyxRTC)
+        
+        if (typeof TelnyxRTC !== 'function') {
+            console.error('❌ TelnyxRTC is not a function!')
+            console.error('Module structure:', JSON.stringify(Object.keys(telnyxModule)))
+            console.error('All module properties:', telnyxModule)
+            throw new Error(`TelnyxRTC is not a constructor. Type: ${typeof TelnyxRTC}. Available keys: ${Object.keys(telnyxModule).join(', ')}`)
+        }
 
         // Get credentials from selected connection
+        console.log('🔐 Getting credentials...')
         const credentials = getCurrentConnectionCredentials()
+        console.log('🔐 Credentials found:', credentials ? 'Yes' : 'No')
+        console.log('🔐 Login:', credentials?.login)
+        
         if (!credentials) {
             throw new Error('No valid credentials found for selected connection. Please ensure the SIP connection has login and password configured in the database.')
         }
         
         
         // Initialize WebRTC client according to Telnyx documentation
-        webrtcClient = new TelnyxRTC({
-            login: credentials.login,    
-            password: credentials.password,
-            audio: true,
-            video: false,
-            debug: false // Disable debug mode for production
-        })
-        // addTranscriptEntry('System', `WebRTC initialized with SIP connection: ${selectedConnectionData.value.name}`)
+        console.log('🔧 Creating TelnyxRTC instance...')
+        console.log('🔧 Config:', { login: credentials.login, audio: true, video: false, debug: false })
+        
+        try {
+            webrtcClient = new TelnyxRTC({
+                login: credentials.login,    
+                password: credentials.password,
+                audio: true,
+                video: false,
+                debug: true // Disable debug mode for production
+            })
+            console.log('✅ TelnyxRTC instance created successfully:', webrtcClient)
+        } catch (constructorError) {
+            console.error('❌ Failed to create TelnyxRTC instance:', constructorError)
+            console.error('Constructor error details:', constructorError.message)
+            throw new Error(`Failed to create TelnyxRTC: ${constructorError.message}`)
+        }
+        
+        addTranscriptEntry('System', `WebRTC client created with login: ${credentials.login}`)
 
         // Set remote audio element
+        console.log('🔊 Setting remote audio element...')
         webrtcClient.remoteElement = 'remoteMedia'
+        console.log('🔊 Remote element set to: remoteMedia')
 
         // Event listeners
+        console.log('🎧 Setting up event listeners...')
+        
         webrtcClient.on('telnyx.ready', () => {
+            console.log('✅ telnyx.ready event fired')
             webrtcStatus.value = 'ready'
-            // addTranscriptEntry('System', 'WebRTC client initialized and ready for calls')
+            addTranscriptEntry('System', '✅ WebRTC client ready for calls')
         })
 
         webrtcClient.on('telnyx.error', (error) => {
+            console.error('❌ telnyx.error event:', error)
+            console.error('Error details:', error.message, error.code, error)
             lastError.value = error.message
             webrtcStatus.value = 'error'
             addTranscriptEntry('Error', `WebRTC error: ${error.message}`)
         })
 
         webrtcClient.on('telnyx.notification', (notification) => {
+            console.log('📢 telnyx.notification:', notification)
             
             // Handle call updates according to official Telnyx documentation
             if (notification.type === 'callUpdate' && notification.call) {
@@ -1069,11 +1154,23 @@ const initializeWebRTC = async () => {
             }
         })
 
+        console.log('🔌 Attempting to connect to Telnyx...')
         await webrtcClient.connect()
+        console.log('✅ WebRTC connect() call completed')
 
     } catch (error) {
+        console.error('❌ WebRTC Initialization Error:', error)
+        console.error('Error stack:', error.stack)
+        console.error('Error message:', error.message)
+        
         lastError.value = error.message
         webrtcStatus.value = 'error'
+        
+        addTranscriptEntry('Error', `WebRTC initialization failed: ${error.message}`)
+        addTranscriptEntry('Error', `Full error: ${error.stack || error.toString()}`)
+        
+        // Show alert to user
+        alert(`WebRTC Failed to Initialize:\n\n${error.message}\n\nCheck console for details.`)
     }
 }
 

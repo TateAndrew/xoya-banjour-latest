@@ -18,16 +18,11 @@ export default defineConfig({
         }),
     ],
     optimizeDeps: {
-        include: ['@telnyx/webrtc']
+        include: ['@telnyx/webrtc', 'pusher-js']
     },
     build: {
         commonjsOptions: {
-            include: [/@telnyx\/webrtc/]
-        }
-    },
-    resolve: {
-        alias: {
-            '@telnyx/webrtc': '@telnyx/webrtc/lib/bundle.js'
+            include: [/@telnyx\/webrtc/, /pusher-js/, /node_modules/]
         }
     }
 });
