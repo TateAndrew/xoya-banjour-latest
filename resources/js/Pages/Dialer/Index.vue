@@ -533,13 +533,19 @@
 
                                 <!-- Transcript Content -->
                                 <div class="bg-gray-50 rounded-lg p-4 h-64 overflow-y-auto">
+                                    <!-- Debug: Show transcript count -->
+                                    <div class="text-xs text-blue-600 mb-2">
+                                        Transcript entries: {{ transcript.length }}
+                                    </div>
+                                    
                                     <div v-if="transcript.length === 0" class="text-center text-gray-500 py-8">
                                         <span class="text-2xl mb-2 block">📞</span>
                                         <p>Start a call to see transcript</p>
+                                        <p class="text-xs mt-2">Waiting for transcript entries...</p>
                                     </div>
                                     <div v-else class="space-y-3">
                                         <div v-for="(entry, index) in transcript" :key="index" 
-                                             class="text-sm">
+                                             class="text-sm bg-white p-2 rounded border border-gray-200">
                                             <div class="flex items-start space-x-2">
                                                 <span class="text-gray-500 text-xs w-16 flex-shrink-0">
                                                     {{ entry.timestamp }}
@@ -879,7 +885,10 @@ const showCallNotification = (title, message, type = 'info') => {
 
 const addTranscriptEntry = (type, message) => {
     const timestamp = new Date().toLocaleTimeString()
-    transcript.value.push({ type, message, timestamp })
+    const entry = { type, message, timestamp }
+    transcript.value.push(entry)
+    console.log('📝 Transcript entry added:', entry)
+    console.log('📝 Total transcript entries:', transcript.value.length)
 }
 
 const clearTranscript = () => {
