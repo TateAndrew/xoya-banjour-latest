@@ -268,9 +268,9 @@ Route::middleware(['auth'])->group(function () {
 
 // Webhook routes (no auth required)
 Route::post('/api/telnyx/webhook', [TelnyxController::class, 'webhook']);
-Route::post('/webhooks/telnyx/sms', [WebhookController::class, 'handleSmsWebhook']);
+Route::post('/webhooks/telnyx/sms', [WebhookController::class, 'handleSmsWebhook'])->withoutMiddleware(['web', 'auth']);
 Route::post('/webhooks/telnyx/dlr', [WebhookController::class, 'handleDeliveryReceipt']);
-Route::post('/webhook/call', [WebhookController::class, 'handleCallWebhook']);
+Route::post('/webhook/call', [WebhookController::class, 'handleCallWebhook'])->withoutMiddleware(['web', 'auth']);
 Route::get('/api/webhook/call', [WebhookController::class, 'getCall']);
 
 
