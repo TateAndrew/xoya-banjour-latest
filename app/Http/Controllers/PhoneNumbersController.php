@@ -345,4 +345,71 @@ class PhoneNumbersController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Display the recording settings edit page
+     */
+    public function editRecordingSettings(PhoneNumber $phoneNumber)
+    {
+        // Ensure user owns this phone number
+        if ($phoneNumber->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        return Inertia::render('PhoneNumbers/EditRecordingSettings', [
+            'phoneNumber' => $phoneNumber
+        ]);
+    }
+
+    /**
+     * Update phone number recording settings
+     */
+    public function updateRecordingSettings(Request $request, PhoneNumber $phoneNumber)
+    {
+        // Ensure user owns this phone number
+        if ($phoneNumber->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'inbound_call_recording_enabled' => 'required|boolean',
+            'inbound_call_recording_format' => 'required|in:wav,mp3',
+            'inbound_call_recording_channels' => 'required|in:single,dual',
+        ]);
+
+        try {
+            // Update in Telnyx API
+            if ($phoneNumber->telynx_id) {
+                $result = $this->telnyxService->updatePhoneNumberRecordingSettings(
+                    $phoneNumber->telynx_id,
+                    $request->only([
+                        'inbound_call_recording_enabled',
+                        'inbound_call_recording_format',
+                        'inbound_call_recording_channels'
+                    ])
+                );
+
+                if (!$result['success']) {
+                    return back()->withErrors([
+                        'error' => 'Failed to update recording settings in Telnyx: ' . $result['error']
+                    ]);
+                }
+            }
+
+            // Update local database
+            $phoneNumber->update([
+                'inbound_call_recording_enabled' => $request->inbound_call_recording_enabled,
+                'inbound_call_recording_format' => $request->inbound_call_recording_format,
+                'inbound_call_recording_channels' => $request->inbound_call_recording_channels,
+            ]);
+
+            return back()->with('success', 'Recording settings updated successfully!');
+
+        } catch (\Exception $e) {
+            Log::error('Phone number recording settings update error: ' . $e->getMessage());
+            return back()->withErrors([
+                'error' => 'An error occurred while updating recording settings.'
+            ]);
+        }
+    }
 }

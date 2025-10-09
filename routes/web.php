@@ -9,6 +9,10 @@ use App\Http\Controllers\MessagingProfileController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\DialerController;
+use App\Http\Controllers\RecordingController;
+use App\Http\Controllers\TranscriptionController;
+use App\Http\Controllers\OutboundVoiceProfileController;
+use App\Http\Controllers\BillingController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -82,6 +86,10 @@ Route::middleware('auth')->group(function () {
     Route::put('/phone-numbers/{phoneNumber}', [PhoneNumbersController::class, 'update'])->name('phone-numbers.update');
     Route::delete('/phone-numbers/{phoneNumber}', [PhoneNumbersController::class, 'destroy'])->name('phone-numbers.destroy');
     Route::post('/phone-numbers/{phoneNumber}/sync', [PhoneNumbersController::class, 'sync'])->name('phone-numbers.sync');
+    
+    // Phone Number Recording Settings
+    Route::get('/phone-numbers/{phoneNumber}/recording-settings', [PhoneNumbersController::class, 'editRecordingSettings'])->name('phone-numbers.edit-recording-settings');
+    Route::put('/phone-numbers/{phoneNumber}/recording-settings', [PhoneNumbersController::class, 'updateRecordingSettings'])->name('phone-numbers.update-recording-settings');
     
     // API endpoint for phone numbers (used by SIP trunk assignment)
     Route::get('/api/phone-numbers', [PhoneNumbersController::class, 'getPhoneNumbersJson'])->name('phone-numbers.json');
@@ -179,6 +187,64 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/transcription/stop', [DialerController::class, 'stopTranscription']);
 });
 
+// Call Recording Routes
+Route::middleware(['auth'])->group(function () {
+    Route::get('/recordings', [RecordingController::class, 'index'])->name('recordings.index');
+    Route::get('/api/recordings', [RecordingController::class, 'list'])->name('recordings.list');
+    Route::get('/api/recordings/{id}', [RecordingController::class, 'show'])->name('recordings.show');
+    Route::delete('/api/recordings/{id}', [RecordingController::class, 'destroy'])->name('recordings.destroy');
+    Route::get('/api/recordings/{id}/download', [RecordingController::class, 'download'])->name('recordings.download');
+    Route::get('/api/recordings/{id}/transcription', [RecordingController::class, 'getTranscription'])->name('recordings.transcription');
+    Route::get('/api/calls/{callId}/recordings', [RecordingController::class, 'getByCall'])->name('recordings.by-call');
+    Route::post('/api/recordings/sync', [RecordingController::class, 'syncFromTelnyx'])->name('recordings.sync');
+    Route::get('/api/recordings/fetch/{telnyxRecordingId}', [RecordingController::class, 'fetchFromTelnyx'])->name('recordings.fetch');
+});
+
+// Transcription Routes
+Route::middleware(['auth'])->group(function () {
+    Route::get('/transcriptions', [TranscriptionController::class, 'index'])->name('transcriptions.index');
+    Route::get('/api/transcriptions', [TranscriptionController::class, 'list'])->name('transcriptions.list');
+    Route::get('/api/transcriptions/{id}', [TranscriptionController::class, 'show'])->name('transcriptions.show');
+    Route::get('/api/transcriptions/recording/{recordingId}', [TranscriptionController::class, 'getByRecording'])->name('transcriptions.by-recording');
+});
+
+// Outbound Voice Profile Routes
+Route::middleware(['auth'])->group(function () {
+    // List and create routes (must come before dynamic routes)
+    Route::get('/outbound-voice-profiles', [OutboundVoiceProfileController::class, 'index'])->name('outbound-voice-profiles.index');
+    Route::get('/outbound-voice-profiles/create', [OutboundVoiceProfileController::class, 'create'])->name('outbound-voice-profiles.create');
+    Route::post('/outbound-voice-profiles', [OutboundVoiceProfileController::class, 'store'])->name('outbound-voice-profiles.store');
+    
+    // Sync route (must come before dynamic {outboundVoiceProfile} routes)
+    Route::post('/outbound-voice-profiles/sync', [OutboundVoiceProfileController::class, 'syncFromTelnyx'])->name('outbound-voice-profiles.sync');
+    
+    // Dynamic routes (must come last)
+    Route::get('/outbound-voice-profiles/{outboundVoiceProfile}', [OutboundVoiceProfileController::class, 'show'])->name('outbound-voice-profiles.show');
+    Route::get('/outbound-voice-profiles/{outboundVoiceProfile}/edit', [OutboundVoiceProfileController::class, 'edit'])->name('outbound-voice-profiles.edit');
+    Route::put('/outbound-voice-profiles/{outboundVoiceProfile}', [OutboundVoiceProfileController::class, 'update'])->name('outbound-voice-profiles.update');
+    Route::delete('/outbound-voice-profiles/{outboundVoiceProfile}', [OutboundVoiceProfileController::class, 'destroy'])->name('outbound-voice-profiles.destroy');
+    
+    // API endpoint for outbound voice profiles
+    Route::get('/api/outbound-voice-profiles', [OutboundVoiceProfileController::class, 'getProfilesJson'])->name('outbound-voice-profiles.json');
+});
+
+// Billing Routes
+Route::middleware(['auth'])->group(function () {
+    // Billing dashboard
+    Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
+    Route::get('/billing/invoices', [BillingController::class, 'invoices'])->name('billing.invoices');
+    Route::get('/billing/usage', [BillingController::class, 'usage'])->name('billing.usage');
+    
+    // API endpoints for billing data
+    Route::get('/api/billing/balance', [BillingController::class, 'getBalance'])->name('billing.balance');
+    Route::get('/api/billing/invoices', [BillingController::class, 'listInvoices'])->name('billing.invoices.list');
+    Route::get('/api/billing/invoices/{id}', [BillingController::class, 'getInvoice'])->name('billing.invoices.show');
+    Route::get('/api/billing/invoices/{id}/download', [BillingController::class, 'downloadInvoice'])->name('billing.invoices.download');
+    Route::get('/api/billing/groups', [BillingController::class, 'getBillingGroups'])->name('billing.groups');
+    Route::get('/api/billing/usage', [BillingController::class, 'getUsageReports'])->name('billing.usage.reports');
+    Route::get('/api/billing/payment-methods', [BillingController::class, 'getPaymentMethods'])->name('billing.payment-methods');
+});
+
 
 // Webhook routes (no auth required)
 Route::post('/api/telnyx/webhook', [TelnyxController::class, 'webhook']);
@@ -192,11 +258,10 @@ Route::post('/test/pusher', function() {
     if (!app()->environment('local')) {
         abort(404);
     }
-    
     // Test Pusher broadcasting
     event(new \App\Events\CallStatusUpdated(
         new \App\Models\Call([
-            'call_session_id' => 'test-session-' . time(),
+            'call_session_id' => 'test-session-' .   time(),
             'call_control_id' => 'test-control-' . time(),
             'from_number' => '+1234567890',
             'to_number' => '+0987654321',

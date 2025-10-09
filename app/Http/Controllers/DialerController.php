@@ -31,10 +31,29 @@ class DialerController extends Controller
         $phoneNumbers = $user->phoneNumbers()->where('status', 'purchased')->get();
         $sipCredentials = $this->getSipCredentials($user);
         
+        // Get recent calls for the user (last 10 calls)
+        $recentCalls = \App\Models\Call::where('user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function ($call) {
+                return [
+                    'id' => $call->id,
+                    'from_number' => $call->from_number,
+                    'to_number' => $call->to_number,
+                    'direction' => $call->direction,
+                    'status' => $call->status,
+                    'duration' => $call->duration_formatted ?? $call->duration,
+                    'created_at' => $call->created_at,
+                    'time_ago' => $call->created_at->diffForHumans(),
+                ];
+            });
+        
         return Inertia::render('Dialer/Index', [
             'phoneNumbers' => $phoneNumbers,
             'user' => $user,
             'sipCredentials' => $sipCredentials,
+            'recentCalls' => $recentCalls,
         ]);
     }
 

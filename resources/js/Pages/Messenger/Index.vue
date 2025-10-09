@@ -1,13 +1,14 @@
 <template>
   <div class="flex h-screen bg-gray-100">
     <!-- Sidebar -->
-    <div class="w-80 bg-white border-r border-gray-200">
-      <div class="p-4 border-b border-gray-200">
+    <div class="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <!-- Sidebar Header -->
+      <div class="p-4 border-b border-gray-200 flex-shrink-0">
         <div class="flex items-center justify-between mb-2">
-          <h1 class="text-xl font-semibold text-gray-900">SMS Messenger</h1>
+          <h1 class="text-xl font-semibold text-gray-900">Messenger</h1>
           <button
             @click="loadConversations()"
-            class="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md p-1"
+            class="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md p-1 transition-colors"
             title="Refresh conversations"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -18,64 +19,106 @@
         <div class="mt-2 space-y-2">
           <button
             @click="showNewContactModal = true"
-            class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-lg hover:from-blue-600 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 shadow-sm hover:shadow-md"
           >
-            New Contact
+            <span class="flex items-center justify-center">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+              </svg>
+              New Contact
+            </span>
           </button>
           <button
             @click="showNewConversationModal = true"
-            class="w-full bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+            class="w-full bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-lg hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 shadow-sm hover:shadow-md"
           >
-            New Conversation
+            <span class="flex items-center justify-center">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+              </svg>
+              New Conversation
+            </span>
           </button>
         </div>
       </div>
       
-      <!-- Contact List -->
-      <div class="overflow-y-auto h-full">
+      <!-- Conversations List with Scrollbar -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar">
         <div
           v-for="conversation in conversations"
           :key="conversation.id"
           @click="selectConversation(conversation)"
           :class="[
-            'p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors',
-            selectedConversation?.id === conversation.id ? 'bg-blue-50 border-blue-200' : ''
+            'p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-all duration-200',
+            selectedConversation?.id === conversation.id ? 'bg-blue-50 border-l-4 border-l-blue-500 border-b-gray-100' : 'border-l-4 border-l-transparent'
           ]"
         >
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-              <span class="text-white font-medium text-sm">
-                {{ conversation.contact?.initials || '?' }}
-              </span>
+          <div class="flex items-start space-x-3">
+            <!-- Avatar -->
+            <div class="relative flex-shrink-0">
+              <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-md">
+                <span class="text-white font-semibold text-sm">
+                  {{ conversation.contact?.initials || '?' }}
+                </span>
+              </div>
+              <!-- Unread Badge on Avatar -->
+              <div v-if="conversation.unread_count > 0" class="absolute -top-1 -right-1">
+                <span class="inline-flex items-center justify-center w-5 h-5 text-xs font-bold leading-none text-white bg-red-500 rounded-full ring-2 ring-white">
+                  {{ conversation.unread_count > 9 ? '9+' : conversation.unread_count }}
+                </span>
+              </div>
             </div>
+            
+            <!-- Conversation Details -->
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900 truncate">
-                {{ conversation.contact?.display_name || conversation.contact?.phone_e164 || 'Unknown' }}
-              </p>
-              <p class="text-sm text-gray-500 truncate">
-                {{ conversation.last_message ? conversation.last_message.short_content : 'No messages yet' }}
-              </p>
-              <p class="text-xs text-gray-400 mt-1">
-                {{ formatTime(conversation.last_message_at) }}
-              </p>
-            </div>
-            <div v-if="conversation.unread_count > 0" class="ml-2 flex-shrink-0">
-              <span class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
-                {{ conversation.unread_count }}
-              </span>
+              <div class="flex items-center justify-between mb-0.5">
+                <div class="flex-1 min-w-0">
+                  <!-- Contact Name -->
+                  <p class="text-sm font-semibold text-gray-900 truncate">
+                    {{ conversation.contact?.name || conversation.contact?.display_name || 'Unknown Contact' }}
+                  </p>
+                  <!-- Phone Number -->
+                  <p v-if="conversation.contact?.name" class="text-xs text-gray-500 truncate">
+                    {{ conversation.contact?.phone_e164 }}
+                  </p>
+                </div>
+                <p class="text-xs text-gray-500 ml-2 flex-shrink-0">
+                  {{ formatTime(conversation.last_message_at) }}
+                </p>
+              </div>
+              
+              <!-- Last Message Preview -->
+              <div class="flex items-center mt-1">
+                <p :class="[
+                  'text-xs truncate flex-1',
+                  conversation.unread_count > 0 ? 'text-gray-900 font-medium' : 'text-gray-500'
+                ]">
+                  <span v-if="conversation.last_message">
+                    <span v-if="conversation.last_message.direction === 'outbound'" class="text-blue-600 mr-1">You:</span>
+                    {{ conversation.last_message.content || 'No message content' }}
+                  </span>
+                  <span v-else class="italic text-gray-400">No messages yet</span>
+                </p>
+              </div>
             </div>
           </div>
         </div>
         
+        <!-- Empty State -->
         <div v-if="conversations.length === 0" class="p-8 text-center text-gray-500">
-          <p>No conversations yet</p>
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 mb-4">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+            </svg>
+          </div>
+          <p class="font-medium text-gray-700">No conversations yet</p>
           <p class="text-sm mt-2">Start by adding a contact and sending a message</p>
         </div>
       </div>
     </div>
 
     <!-- Main Chat Area -->
-    <div class="flex-1 flex flex-col">
+    <div class="flex-1 flex flex-col min-h-0">
       <div v-if="!hasPhoneNumbers" class="flex-1 flex items-center justify-center">
         <div class="text-center max-w-md mx-auto p-8">
           <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -96,7 +139,7 @@
           </div>
         </div>
       </div>
-      <div v-else-if="selectedConversation" class="flex-1 flex flex-col">
+      <div v-else-if="selectedConversation" class="flex-1 flex flex-col min-h-0">
         <ConversationView 
           :key="selectedConversation?.id"
           :conversation="selectedConversation"
@@ -626,6 +669,57 @@ const handleVisibilityChange = () => {
   }
 }
 
+// Real-time broadcasting setup
+const setupRealtimeBroadcasting = () => {
+  if (!window.Echo) {
+    console.warn('Echo not initialized - real-time features disabled')
+    return
+  }
+
+  // Get current user ID from the page meta or authentication
+  const userId = document.querySelector('meta[name="user-id"]')?.getAttribute('content')
+  
+  if (!userId) {
+    console.warn('User ID not found - cannot setup real-time messaging')
+    return
+  }
+
+  // Listen for new messages on user's public channel
+  window.Echo.channel(`user.${userId}`)
+    .listen('.message.received', (event) => {
+      console.log('New message received:', event)
+      debugger
+      // Update conversations list
+      loadConversations()
+      
+      // Show notification
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('New SMS Message', {
+          body: event.message?.content || 'You have a new message',
+          icon: '/favicon.ico',
+          tag: `message-${event.message?.id}`
+        })
+      }
+    })
+
+  // Listen on selected conversation's public channel
+  const listenToConversation = (conversationId) => {
+    window.Echo.channel(`messenger.${conversationId}`)
+      .listen('.message.sent', (event) => {
+        console.log('Message sent in conversation:', event)
+        // Refresh the specific conversation
+        loadConversations()
+      })
+  }
+
+  // Clean up function
+  return () => {
+    if (window.Echo) {
+      window.Echo.leave(`user.${userId}`)
+    }
+  }
+}
+
 onMounted(() => {
   // Only load conversations if not already provided via props
   if (!props.conversations || props.conversations.length === 0) {
@@ -641,11 +735,21 @@ onMounted(() => {
   // Request notification permission
   requestNotificationPermission()
   
-  // Start polling for new conversations
+  // Setup real-time broadcasting (prioritize this over polling)
+  const cleanupBroadcasting = setupRealtimeBroadcasting()
+  
+  // Start polling for new conversations (as fallback)
   startPolling()
   
   // Listen for visibility changes
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  
+  // Store cleanup function
+  onUnmounted(() => {
+    stopPolling()
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+    if (cleanupBroadcasting) cleanupBroadcasting()
+  })
 })
 
 // Cleanup on unmount
@@ -654,3 +758,29 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
+
+<style scoped>
+/* Custom Scrollbar for Sidebar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Smooth transitions */
+.custom-scrollbar {
+  scroll-behavior: smooth;
+}
+</style>

@@ -58,16 +58,20 @@ class MessagingProfileService
                 'profile_id' => $profile->id
             ];
         } catch (ApiErrorException $e) {
-            Log::error('Telnyx Messaging Profile Creation Error: ' . $e->getMessage());
+            $errorMessage = $this->formatTelnyxError($e);
+            Log::error('Telnyx Messaging Profile Creation Error: ' . $errorMessage, [
+                'exception' => $e->getMessage(),
+                'http_status' => $e->getHttpStatus()
+            ]);
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $errorMessage
             ];
         } catch (\Exception $e) {
             Log::error('Messaging Profile Creation Error: ' . $e->getMessage());
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
         }
     }
@@ -129,16 +133,20 @@ class MessagingProfileService
                 'profile_id' => $profile->id
             ];
         } catch (ApiErrorException $e) {
-            Log::error('Telnyx Messaging Profile Update Error: ' . $e->getMessage());
+            $errorMessage = $this->formatTelnyxError($e);
+            Log::error('Telnyx Messaging Profile Update Error: ' . $errorMessage, [
+                'exception' => $e->getMessage(),
+                'http_status' => $e->getHttpStatus()
+            ]);
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $errorMessage
             ];
         } catch (\Exception $e) {
             Log::error('Messaging Profile Update Error: ' . $e->getMessage());
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
         }
     }
@@ -156,16 +164,20 @@ class MessagingProfileService
                 'data' => $profile
             ];
         } catch (ApiErrorException $e) {
-            Log::error('Telnyx Messaging Profile Retrieve Error: ' . $e->getMessage());
+            $errorMessage = $this->formatTelnyxError($e);
+            Log::error('Telnyx Messaging Profile Retrieve Error: ' . $errorMessage, [
+                'exception' => $e->getMessage(),
+                'http_status' => $e->getHttpStatus()
+            ]);
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $errorMessage
             ];
         } catch (\Exception $e) {
             Log::error('Messaging Profile Retrieve Error: ' . $e->getMessage());
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
         }
     }
@@ -191,16 +203,20 @@ class MessagingProfileService
                 ];
             }
         } catch (ApiErrorException $e) {
-            Log::error('Telnyx Messaging Profile Delete Error: ' . $e->getMessage());
+            $errorMessage = $this->formatTelnyxError($e);
+            Log::error('Telnyx Messaging Profile Delete Error: ' . $errorMessage, [
+                'exception' => $e->getMessage(),
+                'http_status' => $e->getHttpStatus()
+            ]);
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $errorMessage
             ];
         } catch (\Exception $e) {
             Log::error('Messaging Profile Delete Error: ' . $e->getMessage());
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
         }
     }
@@ -237,16 +253,33 @@ class MessagingProfileService
                     'data' => json_decode($response, true)
                 ];
             } else {
+                $errorDetails = json_decode($response, true);
+                $errorMessage = 'Telnyx API Error (HTTP ' . $httpCode . ')';
+                
+                if (isset($errorDetails['errors']) && is_array($errorDetails['errors'])) {
+                    $errors = [];
+                    foreach ($errorDetails['errors'] as $error) {
+                        if (isset($error['detail'])) {
+                            $errors[] = $error['detail'];
+                        } elseif (isset($error['title'])) {
+                            $errors[] = $error['title'];
+                        }
+                    }
+                    if (!empty($errors)) {
+                        $errorMessage .= ': ' . implode('; ', $errors);
+                    }
+                }
+                
                 return [
                     'success' => false,
-                    'error' => 'API request failed with status: ' . $httpCode,
+                    'error' => $errorMessage,
                     'response' => $response
                 ];
             }
         } catch (\Exception $e) {
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'API request failed: ' . $e->getMessage()
             ];
         }
     }
@@ -271,17 +304,21 @@ class MessagingProfileService
                 'total' => count($phoneNumbers->data)
             ];
         } catch (ApiErrorException $e) {
-            Log::error('Telnyx Messaging Profile Phone Numbers Error: ' . $e->getMessage());
+            $errorMessage = $this->formatTelnyxError($e);
+            Log::error('Telnyx Messaging Profile Phone Numbers Error: ' . $errorMessage, [
+                'exception' => $e->getMessage(),
+                'http_status' => $e->getHttpStatus()
+            ]);
             return [
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
                 'data' => []
             ];
         } catch (\Exception $e) {
             Log::error('Messaging Profile Phone Numbers Error: ' . $e->getMessage());
             return [
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => 'An unexpected error occurred: ' . $e->getMessage(),
                 'data' => []
             ];
         }
@@ -313,16 +350,20 @@ class MessagingProfileService
                 ];
             }
         } catch (ApiErrorException $e) {
-            Log::error('Telnyx Phone Number Assignment Error: ' . $e->getMessage());
+            $errorMessage = $this->formatTelnyxError($e);
+            Log::error('Telnyx Phone Number Assignment Error: ' . $errorMessage, [
+                'exception' => $e->getMessage(),
+                'http_status' => $e->getHttpStatus()
+            ]);
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $errorMessage
             ];
         } catch (\Exception $e) {
             Log::error('Phone Number Assignment Error: ' . $e->getMessage());
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
         }
     }
@@ -353,16 +394,20 @@ class MessagingProfileService
                 ];
             }
         } catch (ApiErrorException $e) {
-            Log::error('Telnyx Phone Number Unassignment Error: ' . $e->getMessage());
+            $errorMessage = $this->formatTelnyxError($e);
+            Log::error('Telnyx Phone Number Unassignment Error: ' . $errorMessage, [
+                'exception' => $e->getMessage(),
+                'http_status' => $e->getHttpStatus()
+            ]);
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $errorMessage
             ];
         } catch (\Exception $e) {
             Log::error('Phone Number Unassignment Error: ' . $e->getMessage());
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => 'An unexpected error occurred: ' . $e->getMessage()
             ];
         }
     }
@@ -394,19 +439,87 @@ class MessagingProfileService
                 'total' => count($formattedProfiles)
             ];
         } catch (ApiErrorException $e) {
-            Log::error('Telnyx Messaging Profile List Error: ' . $e->getMessage());
+            $errorMessage = $this->formatTelnyxError($e);
+            Log::error('Telnyx Messaging Profile List Error: ' . $errorMessage, [
+                'exception' => $e->getMessage(),
+                'http_status' => $e->getHttpStatus()
+            ]);
             return [
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
                 'data' => []
             ];
         } catch (\Exception $e) {
             Log::error('Messaging Profile List Error: ' . $e->getMessage());
             return [
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => 'An unexpected error occurred: ' . $e->getMessage(),
                 'data' => []
             ];
         }
+    }
+
+    /**
+     * Format Telnyx API error for user-friendly display
+     */
+    private function formatTelnyxError(ApiErrorException $e): string
+    {
+        $message = 'Telnyx API Error';
+        
+        // Get HTTP status code
+        $httpStatus = $e->getHttpStatus();
+        if ($httpStatus) {
+            $message .= ' (HTTP ' . $httpStatus . ')';
+        }
+        
+        // Get detailed error message
+        $errorMessage = $e->getMessage();
+        if ($errorMessage) {
+            $message .= ': ' . $errorMessage;
+        }
+        
+        // Try to get more details from JSON body
+        try {
+            $jsonBody = $e->getJsonBody();
+            if ($jsonBody && isset($jsonBody['errors']) && is_array($jsonBody['errors'])) {
+                $errors = [];
+                foreach ($jsonBody['errors'] as $error) {
+                    if (isset($error['detail'])) {
+                        $errors[] = $error['detail'];
+                    } elseif (isset($error['title'])) {
+                        $errors[] = $error['title'];
+                    }
+                }
+                if (!empty($errors)) {
+                    $message = 'Telnyx API Error: ' . implode('; ', $errors);
+                    if ($httpStatus) {
+                        $message .= ' (HTTP ' . $httpStatus . ')';
+                    }
+                }
+            }
+        } catch (\Exception $jsonException) {
+            // Ignore JSON parsing errors
+            Log::debug('Could not parse Telnyx error JSON: ' . $jsonException->getMessage());
+        }
+        
+        // Provide user-friendly messages for common errors
+        if ($httpStatus === 401) {
+            $message = 'Authentication failed. Please check your Telnyx API key configuration.';
+        } elseif ($httpStatus === 403) {
+            $message = 'Access denied. Your Telnyx account may not have permission for this operation.';
+        } elseif ($httpStatus === 404) {
+            $message = 'Resource not found in Telnyx. The messaging profile may have been deleted.';
+        } elseif ($httpStatus === 422) {
+            // Keep the detailed message for validation errors
+            if (!str_contains($message, ':')) {
+                $message = 'Validation error: ' . $errorMessage;
+            }
+        } elseif ($httpStatus === 429) {
+            $message = 'Rate limit exceeded. Please wait a moment and try again.';
+        } elseif ($httpStatus >= 500) {
+            $message = 'Telnyx server error. Please try again later or contact Telnyx support.';
+        }
+        
+        return $message;
     }
 }

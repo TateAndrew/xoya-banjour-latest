@@ -6,6 +6,8 @@ use App\Models\Contact;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\PhoneNumber;
+use App\Models\Recording;
+use App\Models\Call;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -16,15 +18,58 @@ class WebhookController extends Controller
      */
     public function handleSmsWebhook(Request $request)
     {
-        Log::info('SMS Webhook received', $request->all());
+        try {
+            Log::info('SMS Webhook received', $request->all());
 
-        $data = $request->all();
+            $data = $request->all();
+            $eventType = $data['data']['event_type'] ?? $data['event_type'] ?? null;
+            $payload = $data['data']['payload'] ?? [];
 
-        if ($data['event_type'] === 'message.received') {
-            $this->handleInboundSms($data['data']['payload']);
+            Log::info('Processing SMS webhook', [
+                'event_type' => $eventType,
+                'message_id' => $payload['id'] ?? 'unknown'
+            ]);
+
+            switch ($eventType) {
+                case 'message.received':
+                    $this->handleInboundSms($payload);
+                    break;
+                
+                case 'message.finalized':
+                    $this->handleMessageFinalized($payload);
+                    break;
+                
+                case 'message.sent':
+                    $this->handleMessageSent($payload);
+                    break;
+                
+                case 'message.delivered':
+                    $this->handleMessageDelivered($payload);
+                    break;
+                
+                case 'message.failed':
+                    $this->handleMessageFailed($payload);
+                    break;
+                
+                default:
+                    Log::info('Unhandled SMS webhook event', [
+                        'event_type' => $eventType
+                    ]);
+            }
+
+            return response()->json(['status' => 'success']);
+            
+        } catch (\Exception $e) {
+            Log::error('Error processing SMS webhook: ' . $e->getMessage(), [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
         }
-
-        return response()->json(['status' => 'success']);
     }
 
     /**
@@ -76,6 +121,10 @@ class WebhookController extends Controller
                     break;
                 case 'call.transcription':
                     $this->handleCallTranscription($payload);
+                    break;
+                case 'call.recording.saved':
+                case 'recording.saved':
+                    $this->handleRecordingSaved($payload);
                     break;
                 default:
                     Log::info('Call webhook event logged', ['event_type' => $eventType]);
@@ -158,6 +207,258 @@ class WebhookController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Error processing inbound SMS: ' . $e->getMessage(), [
+                'payload' => $payload,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Handle message.finalized webhook - handles both inbound and outbound messages.
+     */
+    private function handleMessageFinalized($payload)
+    {
+        try {
+            $direction = $payload['direction'] ?? 'outbound';
+            $telnyxId = $payload['id'];
+            $from = $payload['from']['phone_number'] ?? null;
+            $to = $payload['to'][0]['phone_number'] ?? null;
+            $content = $payload['text'] ?? '';
+            $status = $payload['to'][0]['status'] ?? 'sent';
+            $completedAt = $payload['completed_at'] ?? now();
+
+            Log::info('Processing message.finalized', [
+                'direction' => $direction,
+                'from' => $from,
+                'to' => $to,
+                'status' => $status,
+                'telnyx_id' => $telnyxId
+            ]);
+
+            if ($direction === 'inbound') {
+                // Handle inbound message - only if "to" number exists in database
+                $this->handleInboundMessageFinalized($payload);
+            } else {
+                // Handle outbound message - update existing message
+                $message = Message::where('telnyx_message_id', $telnyxId)->first();
+
+                if ($message) {
+                    $statusMap = [
+                        'delivered' => Message::STATUS_DELIVERED,
+                        'sent' => Message::STATUS_SENT,
+                        'sending_failed' => Message::STATUS_FAILED,
+                        'delivery_failed' => Message::STATUS_FAILED,
+                        'delivery_unconfirmed' => Message::STATUS_SENT,
+                    ];
+
+                    $message->update([
+                        'status' => $statusMap[$status] ?? Message::STATUS_SENT,
+                        'delivered_at' => $status === 'delivered' ? $completedAt : null,
+                        'sent_at' => $payload['sent_at'] ?? now()
+                    ]);
+
+                    Log::info('Outbound message finalized', [
+                        'message_id' => $message->id,
+                        'telnyx_id' => $telnyxId,
+                        'status' => $status,
+                        'final_status' => $message->status
+                    ]);
+
+                    // Broadcast message status update
+                    // event(new \App\Events\MessageSent($message));
+                } else {
+                    Log::warning('Message.finalized received for unknown outbound message', [
+                        'telnyx_id' => $telnyxId,
+                        'from' => $from,
+                        'to' => $to
+                    ]);
+                }
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error processing message.finalized: ' . $e->getMessage(), [
+                'payload' => $payload,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * Handle inbound message from message.finalized webhook.
+     */
+    private function handleInboundMessageFinalized($payload)
+    {
+        try {
+            $from = $payload['from']['phone_number'];
+            $to = $payload['to'][0]['phone_number'] ?? null;
+            $content = $payload['text'];
+            $telnyxId = $payload['id'];
+            $completedAt = $payload['completed_at'] ?? now();
+
+            // Find the phone number that received this message
+            $phoneNumber = PhoneNumber::where('phone_number', $to)
+                ->where('status', 'assigned')
+                ->whereNotNull('messaging_profile_id')
+                ->first();
+
+            if (!$phoneNumber) {
+                Log::warning('Received inbound SMS for unknown phone number', [
+                    'to' => $to,
+                    'from' => $from,
+                    'telnyx_id' => $telnyxId
+                ]);
+                return;
+            }
+
+            // Find or create contact
+            $contact = Contact::firstOrCreate(
+                ['phone_e164' => $from],
+                ['name' => null] // Will show phone number as name
+            );
+
+            // Get or create conversation
+            $conversation = Conversation::firstOrCreate(
+                [
+                    'contact_id' => $contact->id,
+                    'sender_number' => $to // The number that received the message
+                ],
+                [
+                    'last_message_at' => $completedAt,
+                    'unread_count' => 0
+                ]
+            );
+
+            // Check if message already exists
+            $existingMessage = $conversation->messages()
+                ->where('telnyx_message_id', $telnyxId)
+                ->first();
+
+            if (!$existingMessage) {
+                // Create new message
+                $message = $conversation->messages()->create([
+                    'telnyx_message_id' => $telnyxId,
+                    'direction' => Message::DIRECTION_INBOUND,
+                    'content' => $content,
+                    'status' => Message::STATUS_DELIVERED,
+                    'delivered_at' => $completedAt,
+                    'sent_at' => $payload['sent_at'] ?? $completedAt
+                ]);
+
+                // Update conversation
+                $conversation->update([
+                    'last_message_at' => $completedAt,
+                    'unread_count' => $conversation->unread_count + 1
+                ]);
+
+                Log::info('Inbound message finalized and saved', [
+                    'message_id' => $message->id,
+                    'contact_id' => $contact->id,
+                    'conversation_id' => $conversation->id,
+                    'telnyx_id' => $telnyxId,
+                    'phone_number_id' => $phoneNumber->id,
+                    'user_id' => $phoneNumber->user_id
+                ]);
+
+                // Broadcast event for real-time updates
+                // event(new \App\Events\MessageReceived($conversation, $message, $phoneNumber->user_id));
+            } else {
+                Log::info('Inbound message already exists', [
+                    'message_id' => $existingMessage->id,
+                    'telnyx_id' => $telnyxId
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error processing inbound message.finalized: ' . $e->getMessage(), [
+                'payload' => $payload,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
+    }
+
+    /**
+     * Handle message.sent webhook.
+     */
+    private function handleMessageSent($payload)
+    {
+        try {
+            $telnyxId = $payload['id'];
+            $message = Message::where('telnyx_message_id', $telnyxId)->first();
+
+            if ($message) {
+                $message->update([
+                    'status' => Message::STATUS_SENT,
+                    'sent_at' => $payload['sent_at'] ?? now()
+                ]);
+
+                Log::info('Message marked as sent', [
+                    'message_id' => $message->id,
+                    'telnyx_id' => $telnyxId
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error processing message.sent: ' . $e->getMessage(), [
+                'payload' => $payload,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Handle message.delivered webhook.
+     */
+    private function handleMessageDelivered($payload)
+    {
+        try {
+            $telnyxId = $payload['id'];
+            $message = Message::where('telnyx_message_id', $telnyxId)->first();
+
+            if ($message) {
+                $message->update([
+                    'status' => Message::STATUS_DELIVERED,
+                    'delivered_at' => now()
+                ]);
+
+                Log::info('Message marked as delivered', [
+                    'message_id' => $message->id,
+                    'telnyx_id' => $telnyxId
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error processing message.delivered: ' . $e->getMessage(), [
+                'payload' => $payload,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Handle message.failed webhook.
+     */
+    private function handleMessageFailed($payload)
+    {
+        try {
+            $telnyxId = $payload['id'];
+            $message = Message::where('telnyx_message_id', $telnyxId)->first();
+
+            if ($message) {
+                $errors = $payload['errors'] ?? [];
+                $message->update([
+                    'status' => Message::STATUS_FAILED,
+                    'failed_at' => now(),
+                    'error_message' => !empty($errors) ? json_encode($errors) : null
+                ]);
+
+                Log::info('Message marked as failed', [
+                    'message_id' => $message->id,
+                    'telnyx_id' => $telnyxId,
+                    'errors' => $errors
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error processing message.failed: ' . $e->getMessage(), [
                 'payload' => $payload,
                 'error' => $e->getMessage()
             ]);
@@ -604,6 +905,64 @@ class WebhookController extends Controller
                 // Broadcast call status update
                 event(new \App\Events\CallStatusUpdated($call, 'failed', 'call.failed'));
             }
+        }
+    }
+
+    /**
+     * Handle recording saved webhook
+     */
+    private function handleRecordingSaved($payload)
+    {
+        Log::info('Recording saved webhook received', $payload);
+        
+        try {
+            // Find associated call
+            $call = null;
+            if (isset($payload['call_session_id'])) {
+                $call = Call::where('call_session_id', $payload['call_session_id'])->first();
+            }
+
+            // Extract recording data
+            $recordingData = [
+                'telnyx_recording_id' => $payload['recording_id'] ?? $payload['id'] ?? null,
+                'call_id' => $call ? $call->id : null,
+                'user_id' => $call ? $call->user_id : null,
+                'call_control_id' => $payload['call_control_id'] ?? null,
+                'call_leg_id' => $payload['call_leg_id'] ?? null,
+                'call_session_id' => $payload['call_session_id'] ?? null,
+                'conference_id' => $payload['conference_id'] ?? null,
+                'channels' => $payload['channels'] ?? 'dual',
+                'source' => $payload['source'] ?? null,
+                'status' => $payload['status'] ?? 'completed',
+                'duration_millis' => $payload['duration_millis'] ?? null,
+                'download_url_mp3' => $payload['recording_urls']['mp3'] ?? $payload['download_urls']['mp3'] ?? null,
+                'download_url_wav' => $payload['recording_urls']['wav'] ?? $payload['download_urls']['wav'] ?? null,
+                'recording_started_at' => isset($payload['recording_started_at']) ? $payload['recording_started_at'] : null,
+                'recording_ended_at' => isset($payload['recording_ended_at']) ? $payload['recording_ended_at'] : now(),
+            ];
+
+            // Create or update recording
+            if (!empty($recordingData['telnyx_recording_id'])) {
+                $recording = Recording::updateOrCreate(
+                    ['telnyx_recording_id' => $recordingData['telnyx_recording_id']],
+                    $recordingData
+                );
+
+                Log::info('Recording saved successfully', [
+                    'recording_id' => $recording->id,
+                    'telnyx_recording_id' => $recording->telnyx_recording_id,
+                    'call_id' => $recording->call_id
+                ]);
+            } else {
+                Log::warning('Recording webhook missing recording ID', $payload);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Error processing recording saved webhook: ' . $e->getMessage(), [
+                'payload' => $payload,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
         }
     }
 

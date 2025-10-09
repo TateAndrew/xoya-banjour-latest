@@ -142,12 +142,21 @@
                         <!-- Footer -->
                         <div class="px-4 py-3 bg-gray-50 border-t border-gray-200">
                             <div class="flex justify-between items-center">
-                                <Link 
-                                    :href="route('phone-numbers.show', number.id)"
-                                    class="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                                >
-                                    View Details
-                                </Link>
+                                <div class="flex space-x-2">
+                                    <Link 
+                                        :href="route('phone-numbers.show', number.id)"
+                                        class="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                                    >
+                                        View Details
+                                    </Link>
+                                    <span class="text-gray-300">|</span>
+                                    <Link 
+                                        :href="route('phone-numbers.edit-recording-settings', number.id)"
+                                        class="text-green-600 hover:text-green-800 text-sm font-medium"
+                                    >
+                                        Recording Settings
+                                    </Link>
+                                </div>
                                 <Link 
                                     :href="route('dialer')"
                                     class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 transition-colors"

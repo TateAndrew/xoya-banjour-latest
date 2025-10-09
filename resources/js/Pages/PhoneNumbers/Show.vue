@@ -79,21 +79,36 @@
                         </div>
 
                         <!-- Telnyx Data -->
-                        <div v-if="telnyxData.success" class="mb-8">
+                        <!-- <div v-if="telnyxData.success" class="mb-8">
                             <h4 class="text-lg font-medium mb-3">Telnyx Information</h4>
                             <div class="bg-gray-50 rounded-lg p-4">
                                 <pre class="text-sm text-gray-700 overflow-x-auto">{{ JSON.stringify(telnyxData.data, null, 2) }}</pre>
                             </div>
-                        </div>
+                        </div> -->
 
                         <!-- Actions -->
                         <div class="border-t pt-6">
                             <h4 class="text-lg font-medium mb-4">Actions</h4>
-                            <div class="flex space-x-4">
-                                <button @click="releaseNumber" :disabled="releasing" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50">
+                            <div class="flex flex-wrap gap-4">
+                                <Link 
+                                    :href="route('phone-numbers.edit-recording-settings', phoneNumber.id)" 
+                                    class="inline-flex items-center bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                                >
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                    Recording Settings
+                                </Link>
+                                <button @click="releaseNumber" :disabled="releasing" class="inline-flex items-center bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
                                     {{ releasing ? 'Releasing...' : 'Release Number' }}
                                 </button>
-                                <Link :href="route('phone-numbers.index')" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                                <Link :href="route('phone-numbers.index')" class="inline-flex items-center bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                    </svg>
                                     Back to Numbers
                                 </Link>
                             </div>

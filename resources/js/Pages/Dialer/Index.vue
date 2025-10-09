@@ -22,13 +22,84 @@
                 <!-- Beautiful Telnyx Dialer Interface -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     
-                    <!-- Left Panel - Call Controls -->
+                    <!-- Left Panel - Recent Calls -->
                     <div class="lg:col-span-1">
                         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                             <div class="p-6 space-y-6">
-                                <!-- Beautiful Call Status Display -->
+                                <!-- Recent Calls Header -->
                                 <div class="text-center">
-                                    <div class="w-32 h-32 mx-auto mb-6 rounded-full flex items-center justify-center text-5xl shadow-lg transform transition-all duration-300 hover:scale-105"
+                                    <h3 class="text-xl font-bold text-gray-900 mb-4">📞 Recent Calls</h3>
+                                </div>
+
+                                <!-- Recent Calls List -->
+                                <div class="space-y-3 max-h-96 overflow-y-auto">
+                                    <!-- Empty state when no recent calls -->
+                                    <div v-if="!recentCalls || recentCalls.length === 0" class="text-center py-8 text-gray-500">
+                                        <span class="text-2xl mb-2 block">📞</span>
+                                        <p>No recent calls</p>
+                                    </div>
+
+                                    <!-- Dynamic Recent Call Items -->
+                                    <div v-for="call in recentCalls" :key="call.id" 
+                                         @click="fillFromRecentCall(call)"
+                                         class="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center space-x-3">
+                                                <div class="w-8 h-8 rounded-full flex items-center justify-center"
+                                                     :class="{
+                                                         'bg-green-100': call.direction === 'inbound' || call.direction === 'incoming',
+                                                         'bg-blue-100': call.direction === 'outbound' || call.direction === 'outgoing',
+                                                         'bg-red-100': call.status === 'failed' || call.status === 'missed',
+                                                         'bg-gray-100': !call.direction
+                                                     }">
+                                                    <span class="text-sm"
+                                                          :class="{
+                                                              'text-green-600': call.direction === 'inbound' || call.direction === 'incoming',
+                                                              'text-blue-600': call.direction === 'outbound' || call.direction === 'outgoing',
+                                                              'text-red-600': call.status === 'failed' || call.status === 'missed',
+                                                              'text-gray-600': !call.direction
+                                                          }">📞</span>
+                                                </div>
+                                                <div>
+                                                    <div class="font-medium text-gray-900">
+                                                        {{ call.direction === 'outbound' || call.direction === 'outgoing' ? call.to_number : call.from_number }}
+                                                    </div>
+                                                    <div class="text-xs text-gray-500">{{ call.time_ago }}</div>
+                                                    <div v-if="call.duration" class="text-xs text-gray-400">Duration: {{ call.duration }}</div>
+                                                </div>
+                                            </div>
+                                            <div class="text-xs font-medium"
+                                                 :class="{
+                                                     'text-green-600': call.direction === 'inbound' || call.direction === 'incoming',
+                                                     'text-blue-600': call.direction === 'outbound' || call.direction === 'outgoing',
+                                                     'text-red-600': call.status === 'failed' || call.status === 'missed',
+                                                     'text-gray-600': !call.direction
+                                                 }">
+                                                {{ call.direction === 'inbound' || call.direction === 'incoming' ? 'Incoming' : 
+                                                   call.direction === 'outbound' || call.direction === 'outgoing' ? 'Outgoing' : 
+                                                   call.status === 'failed' ? 'Failed' :
+                                                   call.status === 'missed' ? 'Missed' : 'Unknown' }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Call History Button -->
+                                <div class="pt-4 border-t border-gray-200">
+                                    <a href="/dialer/history" 
+                                       class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center block">
+                                        📝 View All History
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>                    <!-- Center Panel - Dialer -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                            <div class="p-6 space-y-6">
+                                <!-- Call Status Display -->
+                                <div class="text-center">
+                                    <div class="w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center text-4xl shadow-lg transform transition-all duration-300 hover:scale-105"
                                          :class="callStatusClass">
                                         {{ callStatusIcon }}
                                     </div>
@@ -39,10 +110,10 @@
                                     </div>
                                     
                                     <!-- Dialer Number Display -->
-                                    <div v-if="fromNumber" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <!-- <div v-if="fromNumber" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                                         <div class="text-sm text-blue-600 font-medium mb-1">Dialer Number</div>
                                         <div class="text-lg font-bold text-blue-800">{{ fromNumber }}</div>
-                                    </div>
+                                    </div> -->
                                     
                                     <!-- Incoming Call Number Display -->
                                     <div v-if="isIncomingCall && toNumber" class="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -56,180 +127,114 @@
                                         <div class="text-lg font-bold text-blue-800">{{ toNumber }}</div>
                                     </div>
                                     
-                                    <p v-if="callDuration" class="text-3xl font-mono text-blue-600 font-bold tracking-wider">{{ callDuration }}</p>
-                                    
-                                    <!-- Debug Information -->
-                                    <div class="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-left">
-                                        <div class="font-semibold text-yellow-800 mb-1">Debug Info:</div>
-                                        <div>isIncomingCall: {{ isIncomingCall }}</div>
-                                        <div>isRinging: {{ isRinging }}</div>
-                                        <div>isCallActive: {{ isCallActive }}</div>
-                                        <div>callDirection: {{ callDirection }}</div>
-                                        <div>callStatus: {{ callStatus }}</div>
-                                        <div>currentCall exists: {{ currentCall !== null }}</div>
-                                        <div>Show Container: {{ currentCall !== null || isRinging }}</div>
-                                        <div>Show Incoming Buttons: {{ isIncomingCall && isRinging && !isCallActive }}</div>
-                                        <div>Show Outgoing Buttons: {{ !isIncomingCall && isRinging && !isCallActive }}</div>
-                                        <div>Show Active Buttons: {{ isCallActive }}</div>
-                                    </div>
-                                </div>
-                                <!-- Caller Information Section -->
-                                <div v-if="isIncomingCall && toNumber" class="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4 mb-4">
-                                    <div class="text-center">
-                                        <div class="w-16 h-16 mx-auto mb-3 bg-green-600 rounded-full flex items-center justify-center">
-                                            <span class="text-white text-2xl">📞</span>
-                                        </div>
-                                        <h4 class="text-lg font-bold text-green-800 mb-1">Incoming Call</h4>
-                                        <div class="text-2xl font-bold text-green-900 mb-2">{{ toNumber }}</div>
-                                        <div class="text-sm text-green-600">Calling your dialer number</div>
-                                        <div class="text-xs text-green-500 mt-1">{{ fromNumber }}</div>
-                                    </div>
+                                    <p v-if="callDuration" class="text-2xl font-mono text-blue-600 font-bold tracking-wider">{{ callDuration }}</p>
                                 </div>
 
-                                <div  class="space-y-4">
-                                        <!-- Incoming Call Buttons: Answer and Decline for incoming calls -->
-                                        <template v-if="isIncomingCall && !isCallActive">
-                                            <!-- Answer Call Button -->
-                                            <button @click="answerCall" 
-                                                    class="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-200">
-                                                <div class="flex items-center justify-center space-x-2">
-                                                    <span class="text-xl">📞</span>
-                                                    <span>Answer Call</span>
-                                                </div>
-                                            </button>
-                                            
-                                            <!-- Decline Call Button -->
-                                            <button @click="rejectCall" 
-                                                    class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
-                                                <div class="flex items-center justify-center space-x-2">
-                                                    <span class="text-xl">❌</span>
-                                                    <span>Decline Call</span>
-                                                </div>
-                                            </button>
-                                        </template>
-
-                                        <!-- Outgoing Call Buttons: End call during ringing/trying -->
-                                        <template v-if="isConnecting && !isCallActive">
-                                            <!-- End Call Button for outgoing calls -->
-                                          <button @click="endCall" 
-                                                    class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
-                                                <div class="flex items-center justify-center space-x-2">
-                                                    <span class="text-xl">📴</span>
-                                                    <span>End Call</span>
-                                                </div>
-                                            </button>
-                                        </template>
-
-                                        <!-- Active Call Buttons: Only when call is active -->
-                                            <!-- Mute Button -->
-                                    <template v-if="isCallActive && callDirection === 'outgoing'">
-                                            <button @click="toggleMute" 
-                                                    :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
-                                                        isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'
-                                                    }`">
-                                                <div class="flex items-center justify-center space-x-2">
-                                                    <span class="text-xl">{{ isMuted ? '🔇' : '🎤' }}</span>
-                                                    <span>{{ isMuted ? 'Unmute' : 'Mute' }}</span>
-                                                </div>
-                                            </button>
-
-                                            <!-- Hold Button -->
-                                            <button @click="toggleHold" 
-                                                    :class="`w-full py-4 rounded-lg text-white font-semibold transition-all duration-200 ${
-                                                        isOnHold ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'
-                                                    }`">
-                                                <div class="flex items-center justify-center space-x-2">
-                                                    <span class="text-xl">{{ isOnHold ? '⏸️' : '⏸️' }}</span>
-                                                    <span>{{ isOnHold ? 'Resume' : 'Hold' }}</span>
-                                                </div>
-                                            </button>
-
-                                            <!-- Hangup Button -->
-                                            <button @click="endCall" 
-                                                    class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
-                                                <div class="flex items-center justify-center space-x-2">
-                                                    <span class="text-xl">📴</span>
-                                                    <span>End Call</span>
-                                                </div>
-                                            </button>
-
-                                            <!-- Transcription Button -->
-                                            <button @click="toggleTranscription" 
-                                                    :class="transcriptionStatus === 'started' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'"
-                                                    class="w-full py-4 text-white rounded-lg font-semibold transition-all duration-200">
-                                                <div class="flex items-center justify-center space-x-2">
-                                                    <span class="text-xl">{{ transcriptionStatus === 'started' ? '📝' : '🎤' }}</span>
-                                                    <span>{{ transcriptionStatus === 'started' ? 'Stop Transcript' : 'Start Transcript' }}</span>
-                                                </div>
-                                            </button>
-
-                                            <!-- Disconnect Button -->
-                                        <button @click="disconnectCall" 
-                                                class="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                <!-- Call Controls -->
+                                <div class="space-y-3">
+                                    <!-- Incoming Call Buttons: Answer and Decline for incoming calls -->
+                                    <template v-if="isIncomingCall && !isCallActive">
+                                        <!-- Answer Call Button -->
+                                        <button @click="answerCall" 
+                                                class="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-200">
                                             <div class="flex items-center justify-center space-x-2">
-                                                <span class="text-xl">🔌</span>
+                                                <span class="text-xl">📞</span>
+                                                <span>Answer Call</span>
+                                            </div>
+                                        </button>
+                                        
+                                        <!-- Decline Call Button -->
+                                        <button @click="rejectCall" 
+                                                class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-xl">❌</span>
+                                                <span>Decline Call</span>
+                                            </div>
+                                        </button>
+                                    </template>
+
+                                    <!-- Outgoing Call Buttons: End call during ringing/trying -->
+                                    <template v-if="isConnecting && !isCallActive">
+                                        <!-- End Call Button for outgoing calls -->
+                                        <button @click="endCall" 
+                                                class="w-full py-4 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-xl">📴</span>
+                                                <span>End Call</span>
+                                            </div>
+                                        </button>
+                                    </template>
+
+                                    <!-- Active Call Buttons: Show for all active calls (incoming and outgoing) -->
+                                    <template v-if="isCallActive">
+                                        <!-- Mute Button -->
+                                        <button @click="toggleMute" 
+                                                :class="`w-full py-3 rounded-lg text-white font-semibold transition-all duration-200 ${
+                                                    isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'
+                                                }`">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-lg">{{ isMuted ? '🔇' : '🎤' }}</span>
+                                                <span>{{ isMuted ? 'Unmute' : 'Mute' }}</span>
+                                            </div>
+                                        </button>
+
+                                        <!-- Hold Button -->
+                                        <button @click="toggleHold" 
+                                                :class="`w-full py-3 rounded-lg text-white font-semibold transition-all duration-200 ${
+                                                    isOnHold ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'
+                                                }`">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-lg">{{ isOnHold ? '▶️' : '⏸️' }}</span>
+                                                <span>{{ isOnHold ? 'Resume' : 'Hold' }}</span>
+                                            </div>
+                                        </button>
+
+                                        <!-- Loudspeaker Button -->
+                                        <button @click="toggleLoudspeaker" 
+                                                :class="`w-full py-3 rounded-lg text-white font-semibold transition-all duration-200 ${
+                                                    isLoudspeakerOn ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-700'
+                                                }`">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-lg">{{ isLoudspeakerOn ? '🔊' : '🔈' }}</span>
+                                                <span>{{ isLoudspeakerOn ? 'Speaker Off' : 'Speaker On' }}</span>
+                                            </div>
+                                        </button>
+
+                                        <!-- End Call Button -->
+                                        <button @click="endCall" 
+                                                class="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-lg">📴</span>
+                                                <span>End Call</span>
+                                            </div>
+                                        </button>
+
+                                        <!-- Disconnect Button -->
+                                        <button @click="disconnectCall" 
+                                                class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-all duration-200">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-lg">🔌</span>
                                                 <span>Disconnect</span>
+                                            </div>
+                                        </button>
+
+                                        <!-- Transcription Button -->
+                                        <button @click="toggleTranscription" 
+                                                :class="transcriptionStatus === 'started' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'"
+                                                class="w-full py-3 text-white rounded-lg font-semibold transition-all duration-200">
+                                            <div class="flex items-center justify-center space-x-2">
+                                                <span class="text-lg">{{ transcriptionStatus === 'started' ? '📝' : '🎤' }}</span>
+                                                <span>{{ transcriptionStatus === 'started' ? 'Stop Transcript' : 'Start Transcript' }}</span>
                                             </div>
                                         </button>
                                     </template>
                                 </div>
 
-                                <!-- Connection Status -->
-                                <div class="bg-gray-50 rounded-lg p-4">
-                                    <h4 class="text-sm font-medium text-gray-900 mb-3">Connection Status</h4>
-                                    <div class="space-y-2 text-sm">
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-gray-600">WebRTC:</span>
-                                            <span :class="webrtcStatus === 'ready' ? 'text-green-600' : 'text-red-600'">
-                                                {{ webrtcStatus }}
-                                            </span>
-                                        </div>
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-gray-600">Backend:</span>
-                                            <span :class="backendStatus === 'connected' ? 'text-green-600' : 'text-red-600'">
-                                                {{ backendStatus }}
-                                            </span>
-                                        </div>
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-gray-600">Source:</span>
-                                            <span class="text-blue-600">
-                                                Database
-                                            </span>
-                                        </div>
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-gray-600">Connections:</span>
-                                            <span class="text-gray-900 font-medium">
-                                                {{ connections.length }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Quick Actions -->
-                                <div class="space-y-3">
-                                    <button @click="loadConnections" 
-                                            class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                        🔄 Refresh Connections
-                                    </button>
-                                    
-                                    <!-- Debug: Test Incoming Call -->
-                                    <button @click="simulateIncomingCall" 
-                                            class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
-                                        🧪 Test Incoming Call
-                                    </button>
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>                    <!-- Center Panel - Dialer -->
-                    <div class="lg:col-span-1">
-                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                            <div class="p-6 space-y-6">
                                 <!-- Dialer Header -->
-                                <div class="text-center">
+                                <!-- <div class="text-center">
                                     <h3 class="text-2xl font-bold text-gray-900 mb-2">Audio Dialer</h3>
                                     <p class="text-gray-600">Professional calling with WebRTC</p>
-                                </div>
+                                </div> -->
 
                                 <!-- Connection Selection -->
                                 <div>
@@ -252,7 +257,7 @@
 
 
                                 <!-- User Information -->
-                                <div v-if="props.user" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                <!-- <div v-if="props.user" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center space-x-3">
                                             <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
@@ -284,7 +289,7 @@
                                             🔄
                                         </button>
                                     </div>
-                                </div>
+                                </div> -->
 
                                 <!-- Phone Numbers -->
                                 <div class="space-y-4">
@@ -418,53 +423,43 @@
                                     </div>
                                 </button>
 
-                                <!-- Call Status Display -->
-                                <div v-if="callStatus" 
-                                     :class="`p-4 rounded-lg border-2 text-center ${
-                                         callStatus === 'new' ? 'bg-blue-50 border-blue-300 text-blue-800' :
-                                         callStatus === 'trying' ? 'bg-yellow-50 border-yellow-300 text-yellow-800' :
-                                         callStatus === 'requesting' ? 'bg-yellow-50 border-yellow-300 text-yellow-800' :
-                                         callStatus === 'recovering' ? 'bg-orange-50 border-orange-300 text-orange-800' :
-                                         callStatus === 'ringing' ? 'bg-yellow-50 border-yellow-300 text-yellow-800' :
-                                         callStatus === 'answering' ? 'bg-yellow-50 border-yellow-300 text-yellow-800' :
-                                         callStatus === 'early' ? 'bg-yellow-50 border-yellow-300 text-yellow-800' :
-                                         callStatus === 'active' ? 'bg-green-50 border-green-300 text-green-800' :
-                                         callStatus === 'held' ? 'bg-yellow-50 border-yellow-300 text-yellow-800' :
-                                         callStatus === 'hangup' ? 'bg-red-50 border-red-300 text-red-800' :
-                                         callStatus === 'destroy' ? 'bg-red-50 border-red-300 text-red-800' :
-                                         callStatus === 'purge' ? 'bg-red-50 border-red-300 text-red-800' :
-                                         callStatus === 'failed' ? 'bg-red-50 border-red-300 text-red-800' :
-                                         callStatus === 'busy' ? 'bg-orange-50 border-orange-300 text-orange-800' :
-                                         'bg-blue-50 border-blue-300 text-blue-800'
-                                     }`">
-                                    <div class="flex items-center justify-center space-x-2">
-                                        <span class="text-xl">{{ callStatusIcon }}</span>
-                                        <span class="font-semibold">{{ callStatusText }}</span>
-                                    </div>
-                                    
-                                    <!-- Call Numbers Display -->
-                                    <div v-if="(isCallActive || isRinging || isConnecting) && (fromNumber || toNumber)" 
-                                         class="mt-3 pt-3 border-t border-gray-200">
-                                        <div class="space-y-2 text-sm">
-                                            <div v-if="fromNumber" class="flex items-center justify-center space-x-2">
-                                                <span class="text-gray-600">From:</span>
-                                                <span class="font-medium text-gray-800">{{ fromNumber }}</span>
-                                            </div>
-                                            <div v-if="toNumber" class="flex items-center justify-center space-x-2">
-                                                <span class="text-gray-600">{{ isIncomingCall ? 'Caller:' : 'To:' }}</span>
-                                                <span class="font-medium text-gray-800">{{ toNumber }}</span>
-                                            </div>
+                                <!-- Connection Status -->
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <h4 class="text-sm font-medium text-gray-900 mb-3">Connection Status</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-gray-600">WebRTC:</span>
+                                            <span :class="webrtcStatus === 'ready' ? 'text-green-600' : 'text-red-600'">
+                                                {{ webrtcStatus }}
+                                            </span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-gray-600">Backend:</span>
+                                            <span :class="backendStatus === 'connected' ? 'text-green-600' : 'text-red-600'">
+                                                {{ backendStatus }}
+                                            </span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-gray-600">Connections:</span>
+                                            <span class="text-gray-900 font-medium">
+                                                {{ connections.length }}
+                                            </span>
                                         </div>
                                     </div>
+                                </div>
+
+                                <!-- Quick Actions -->
+                                <div class="space-y-3">
+                                    <!-- <button @click="loadConnections" 
+                                            class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                        🔄 Refresh Connections
+                                    </button> -->
                                     
-                                    <!-- Call Quality Indicator (for active calls) -->
-                                    <div v-if="callStatus === 'active' && callDuration !== '00:00'" 
-                                         class="mt-3 pt-3 border-t border-gray-200">
-                                        <div class="flex items-center justify-center space-x-2 text-sm">
-                                            <span class="text-green-600">📶</span>
-                                            <span class="text-gray-600">Call Quality: Good</span>
-                                        </div>
-                                    </div>
+                                    <!-- Debug: Test Incoming Call -->
+                                    <!-- <button @click="simulateIncomingCall" 
+                                            class="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                                        🧪 Test Incoming Call
+                                    </button> -->
                                 </div>
                             </div>
                         </div>
@@ -563,6 +558,7 @@ import axios from 'axios'
 const props = defineProps({
     phoneNumbers: Array,
     user: Object,
+    recentCalls: Array,
 })
 
 const emit = defineEmits(['refreshPhoneNumbers'])
@@ -593,6 +589,7 @@ const isRinging = ref(false)
 const isConnected = ref(false)
 const isMuted = ref(false)
 const isOnHold = ref(false)
+const isLoudspeakerOn = ref(false) // Track loudspeaker state
 const isIncomingCall = ref(false) // Track if current call is incoming
 const transcriptionStatus = ref('') // Track transcription status: '', 'started', 'stopped'
 const callDirection = ref('') // 'incoming' or 'outgoing'
@@ -748,6 +745,23 @@ const backspace = () => {
 
 const clearToNumber = () => {
     toNumber.value = ''
+}
+
+// Fill dialer from recent call
+const fillFromRecentCall = (call) => {
+    // Determine which number to call based on the direction
+    if (call.direction === 'outbound' || call.direction === 'outgoing') {
+        // For outgoing calls, use the number we called
+        toNumber.value = call.to_number
+    } else if (call.direction === 'inbound' || call.direction === 'incoming') {
+        // For incoming calls, use the number that called us
+        toNumber.value = call.from_number
+    } else {
+        // Fallback to to_number
+        toNumber.value = call.to_number || call.from_number
+    }
+    
+    addTranscriptEntry('System', `Number loaded from recent call: ${toNumber.value}`)
 }
 
 const handleKeydown = (event) => {
@@ -1428,6 +1442,7 @@ const endCall = (skipHangup = false) => {
         isRinging.value = false
         isConnected.value = false
         isOnHold.value = false
+        isLoudspeakerOn.value = false
         isIncomingCall.value = false
         callDirection.value = ''
         isConnecting.value = false
@@ -1448,6 +1463,7 @@ const endCall = (skipHangup = false) => {
         isRinging.value = false
         isConnected.value = false
         isOnHold.value = false
+        isLoudspeakerOn.value = false
         isIncomingCall.value = false
         callDirection.value = ''
         isConnecting.value = false

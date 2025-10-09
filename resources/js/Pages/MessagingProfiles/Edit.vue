@@ -10,6 +10,17 @@
 
         <div class="py-12">
             <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+                <!-- Success Message -->
+                <div v-if="$page.props.flash?.success" class="mb-6 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md">
+                    {{ $page.props.flash.success }}
+                </div>
+
+                <!-- Error Message -->
+                <div v-if="$page.props.flash?.error || $page.props.errors?.error" class="mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md">
+                    <div class="font-semibold">Error:</div>
+                    <div>{{ $page.props.flash.error || $page.props.errors.error }}</div>
+                </div>
+
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6">
                         <form @submit.prevent="submit">
@@ -132,6 +143,153 @@
                                             <option value="2">Version 2</option>
                                             <option value="2010-04-01">Version 2010-04-01</option>
                                         </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Number Pool Settings -->
+                            <div class="mb-8">
+                                <h3 class="text-lg font-medium text-gray-900 mb-4">Number Pool Settings</h3>
+                                
+                                <div class="mb-4">
+                                    <div class="flex items-center">
+                                        <input
+                                            v-model="enableNumberPool"
+                                            type="checkbox"
+                                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                                            @change="toggleNumberPool"
+                                        />
+                                        <label class="ml-2 text-sm text-gray-700">Enable number pool distribution</label>
+                                    </div>
+                                    <p class="text-sm text-gray-500 mt-1">Configure how messages are distributed across assigned numbers</p>
+                                </div>
+
+                                <div v-if="enableNumberPool" class="space-y-4 pl-6 border-l-2 border-gray-200">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                Toll-Free Weight <span class="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                v-model.number="form.number_pool_settings.toll_free_weight"
+                                                type="number"
+                                                min="0"
+                                                step="0.1"
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                placeholder="1"
+                                                required
+                                            />
+                                            <p class="text-sm text-gray-500 mt-1">Numeric value, minimum 0 (required)</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                Long Code Weight <span class="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                v-model.number="form.number_pool_settings.long_code_weight"
+                                                type="number"
+                                                min="0"
+                                                step="0.1"
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                placeholder="1"
+                                                required
+                                            />
+                                            <p class="text-sm text-gray-500 mt-1">Numeric value, minimum 0 (required)</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="space-y-3">
+                                        <div class="flex items-center">
+                                            <input
+                                                v-model="form.number_pool_settings.skip_unhealthy"
+                                                type="checkbox"
+                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                                            />
+                                            <label class="ml-2 text-sm text-gray-700">Skip unhealthy numbers</label>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <input
+                                                v-model="form.number_pool_settings.sticky_sender"
+                                                type="checkbox"
+                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                                            />
+                                            <label class="ml-2 text-sm text-gray-700">Maintain same sender per recipient</label>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <input
+                                                v-model="form.number_pool_settings.geomatch"
+                                                type="checkbox"
+                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                                            />
+                                            <label class="ml-2 text-sm text-gray-700">Match recipient's area code (NANP only)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- URL Shortener Settings -->
+                            <div class="mb-8">
+                                <h3 class="text-lg font-medium text-gray-900 mb-4">URL Shortener Settings</h3>
+                                
+                                <div class="mb-4">
+                                    <div class="flex items-center">
+                                        <input
+                                            v-model="enableUrlShortener"
+                                            type="checkbox"
+                                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                                            @change="toggleUrlShortener"
+                                        />
+                                        <label class="ml-2 text-sm text-gray-700">Enable URL shortener</label>
+                                    </div>
+                                    <p class="text-sm text-gray-500 mt-1">Replace public shortener URLs with Telnyx branded short links</p>
+                                </div>
+
+                                <div v-if="enableUrlShortener" class="space-y-4 pl-6 border-l-2 border-gray-200">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                Domain <span class="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                v-model="form.url_shortener_settings.domain"
+                                                type="text"
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                placeholder="Domain provided by Telnyx"
+                                                required
+                                            />
+                                            <p class="text-sm text-gray-500 mt-1">Required when URL shortener is enabled</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                                Brand Prefix
+                                            </label>
+                                            <input
+                                                v-model="form.url_shortener_settings.prefix"
+                                                type="text"
+                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                placeholder="Optional brand prefix"
+                                            />
+                                            <p class="text-sm text-gray-500 mt-1">Optional string (nullable)</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="space-y-3">
+                                        <div class="flex items-center">
+                                            <input
+                                                v-model="form.url_shortener_settings.replace_blacklist_only"
+                                                type="checkbox"
+                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                                            />
+                                            <label class="ml-2 text-sm text-gray-700">Replace only blacklisted shortener URLs</label>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <input
+                                                v-model="form.url_shortener_settings.send_webhooks"
+                                                type="checkbox"
+                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                                            />
+                                            <label class="ml-2 text-sm text-gray-700">Enable click-tracking webhooks</label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -259,6 +417,8 @@ const form = reactive({
     webhook_url: '',
     webhook_failover_url: '',
     webhook_api_version: '2',
+    number_pool_settings: null,
+    url_shortener_settings: null,
     alpha_sender: '',
     daily_spend_limit: '',
     daily_spend_limit_enabled: false,
@@ -268,6 +428,8 @@ const form = reactive({
 
 const processing = ref(false)
 const allowAllCountries = ref(false)
+const enableNumberPool = ref(false)
+const enableUrlShortener = ref(false)
 const toast = ref({
     show: false,
     message: '',
@@ -287,6 +449,33 @@ const toggleAllCountries = () => {
         form.whitelisted_destinations = ['*']
     } else {
         form.whitelisted_destinations = []
+    }
+}
+
+const toggleNumberPool = () => {
+    if (enableNumberPool.value) {
+        form.number_pool_settings = {
+            toll_free_weight: 1,
+            long_code_weight: 1,
+            skip_unhealthy: true,
+            sticky_sender: false,
+            geomatch: false
+        }
+    } else {
+        form.number_pool_settings = null
+    }
+}
+
+const toggleUrlShortener = () => {
+    if (enableUrlShortener.value) {
+        form.url_shortener_settings = {
+            domain: '',
+            prefix: '',
+            replace_blacklist_only: false,
+            send_webhooks: false
+        }
+    } else {
+        form.url_shortener_settings = null
     }
 }
 
@@ -318,6 +507,8 @@ onMounted(() => {
     form.webhook_url = props.messagingProfile.webhook_url || ''
     form.webhook_failover_url = props.messagingProfile.webhook_failover_url || ''
     form.webhook_api_version = props.messagingProfile.webhook_api_version || '2'
+    form.number_pool_settings = props.messagingProfile.number_pool_settings || null
+    form.url_shortener_settings = props.messagingProfile.url_shortener_settings || null
     form.alpha_sender = props.messagingProfile.alpha_sender || ''
     form.daily_spend_limit = props.messagingProfile.daily_spend_limit || ''
     form.daily_spend_limit_enabled = props.messagingProfile.daily_spend_limit_enabled || false
@@ -326,6 +517,12 @@ onMounted(() => {
     
     // Check if all countries are allowed
     allowAllCountries.value = form.whitelisted_destinations.includes('*')
+    
+    // Check if number pool is enabled
+    enableNumberPool.value = form.number_pool_settings !== null
+    
+    // Check if URL shortener is enabled
+    enableUrlShortener.value = form.url_shortener_settings !== null
 })
 </script>
 

@@ -6,7 +6,6 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
 
-
 // Public transcription channels (no authentication required)
 Broadcast::channel('call-transcription', function () {
     return true; // Public channel - anyone can listen

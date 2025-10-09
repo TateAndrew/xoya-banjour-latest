@@ -200,15 +200,35 @@ class MessagingProfileController extends Controller
         }
 
         $request->validate([
-            'name' => 'required|string|max:255',
+            // Required fields
+            'name' => 'required|string',
             'whitelisted_destinations' => 'required|array|min:1',
-            'whitelisted_destinations.*' => 'required|string|size:2|regex:/^[A-Z]{2}$/',
+            'whitelisted_destinations.*' => 'required|string',
+            
+            // Optional with defaults
             'enabled' => 'sometimes|boolean',
             'webhook_url' => 'nullable|url',
             'webhook_failover_url' => 'nullable|url',
-            'webhook_api_version' => 'nullable|string|in:1,2,2010-04-01',
-            'alpha_sender' => 'nullable|string|max:11|regex:/^[a-zA-Z0-9]+$/',
-            'daily_spend_limit' => 'nullable|regex:/^[0-9]+(\.[0-9]+)?$/',
+            'webhook_api_version' => 'sometimes|string|in:1,2,2010-04-01',
+            
+            // Number Pool Settings (nullable object)
+            'number_pool_settings' => 'nullable|array',
+            'number_pool_settings.toll_free_weight' => 'required_with:number_pool_settings|numeric|min:0',
+            'number_pool_settings.long_code_weight' => 'required_with:number_pool_settings|numeric|min:0',
+            'number_pool_settings.skip_unhealthy' => 'required_with:number_pool_settings|boolean',
+            'number_pool_settings.sticky_sender' => 'sometimes|boolean',
+            'number_pool_settings.geomatch' => 'sometimes|boolean',
+            
+            // URL Shortener Settings (nullable object)
+            'url_shortener_settings' => 'nullable|array',
+            'url_shortener_settings.domain' => 'required_with:url_shortener_settings|string',
+            'url_shortener_settings.prefix' => 'nullable|string',
+            'url_shortener_settings.replace_blacklist_only' => 'sometimes|boolean',
+            'url_shortener_settings.send_webhooks' => 'sometimes|boolean',
+            
+            // Additional optional fields
+            'alpha_sender' => 'nullable|string',
+            'daily_spend_limit' => 'nullable|string',
             'daily_spend_limit_enabled' => 'sometimes|boolean',
             'mms_fall_back_to_sms' => 'sometimes|boolean',
             'mms_transcoding' => 'sometimes|boolean',
@@ -225,6 +245,8 @@ class MessagingProfileController extends Controller
                 'webhook_url',
                 'webhook_failover_url',
                 'webhook_api_version',
+                'number_pool_settings',
+                'url_shortener_settings',
                 'alpha_sender',
                 'daily_spend_limit',
                 'daily_spend_limit_enabled',
@@ -247,6 +269,8 @@ class MessagingProfileController extends Controller
                 'webhook_url' => $request->webhook_url,
                 'webhook_failover_url' => $request->webhook_failover_url,
                 'webhook_api_version' => $request->webhook_api_version ?? '2',
+                'number_pool_settings' => $request->number_pool_settings,
+                'url_shortener_settings' => $request->url_shortener_settings,
                 'alpha_sender' => $request->alpha_sender,
                 'daily_spend_limit' => $request->daily_spend_limit,
                 'daily_spend_limit_enabled' => $request->boolean('daily_spend_limit_enabled', false),

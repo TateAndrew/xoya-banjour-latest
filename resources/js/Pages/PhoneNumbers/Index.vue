@@ -106,15 +106,14 @@
                         <div v-if="userNumbers.length > 0">
                             <h3 class="text-lg font-medium mb-4">Your Phone Numbers</h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div v-for="number in userNumbers" :key="number.id" class="border rounded-lg p-4">
+                                <div v-for="number in userNumbers" :key="number.id" class="border rounded-lg p-4 hover:shadow-md transition-shadow">
                                     <div class="flex justify-between items-start mb-2">
                                         <div class="text-lg font-semibold">{{ formatPhoneNumber(number.phone_number) }}</div>
-                                        <Link :href="route('phone-numbers.show', number.id)" class="text-indigo-600 hover:text-indigo-800 text-sm">
-                                            View Details
-                                        </Link>
+                                        <span class="inline-block px-2 py-1 rounded text-xs font-medium" :class="getStatusBadgeClass(number.status)">
+                                            {{ number.status }}
+                                        </span>
                                     </div>
                                     <div class="text-sm text-gray-600">
-                                        <div>Status: <span class="font-medium" :class="getStatusColor(number.status)">{{ number.status }}</span></div>
                                         <div class="mt-1">
                                             <span v-for="capability in number.capabilities" :key="capability" class="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded mr-1 mb-1">
                                                 {{ capability.toUpperCase() }}
@@ -123,6 +122,30 @@
                                         <div class="mt-2 text-xs text-gray-500">
                                             Purchased: {{ formatDate(number.purchased_at) }}
                                         </div>
+                                    </div>
+                                    
+                                    <!-- Action Buttons -->
+                                    <div class="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-2">
+                                        <Link 
+                                            :href="route('phone-numbers.show', number.id)" 
+                                            class="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                                        >
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            View
+                                        </Link>
+                                        <span class="text-gray-300">|</span>
+                                        <Link 
+                                            :href="route('phone-numbers.edit-recording-settings', number.id)" 
+                                            class="inline-flex items-center text-green-600 hover:text-green-800 text-sm font-medium"
+                                        >
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            Recording
+                                        </Link>
                                     </div>
                                 </div>
                             </div>
@@ -230,6 +253,15 @@ const getStatusColor = (status) => {
         case 'pending': return 'text-yellow-600'
         case 'failed': return 'text-red-600'
         default: return 'text-gray-600'
+    }
+}
+
+const getStatusBadgeClass = (status) => {
+    switch (status) {
+        case 'purchased': return 'bg-green-100 text-green-800'
+        case 'pending': return 'bg-yellow-100 text-yellow-800'
+        case 'failed': return 'bg-red-100 text-red-800'
+        default: return 'bg-gray-100 text-gray-800'
     }
 }
 

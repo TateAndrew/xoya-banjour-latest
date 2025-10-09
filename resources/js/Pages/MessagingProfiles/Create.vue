@@ -10,6 +10,17 @@
 
         <div class="py-12">
             <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
+                <!-- Success Message -->
+                <div v-if="$page.props.flash?.success" class="mb-6 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md">
+                    {{ $page.props.flash.success }}
+                </div>
+
+                <!-- Error Message -->
+                <div v-if="$page.props.flash?.error || $page.props.errors?.error" class="mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md">
+                    <div class="font-semibold">Error:</div>
+                    <div>{{ $page.props.flash.error || $page.props.errors.error }}</div>
+                </div>
+
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-6">
                         <form @submit.prevent="submit">

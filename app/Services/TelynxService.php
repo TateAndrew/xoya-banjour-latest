@@ -1449,4 +1449,41 @@ class TelynxService
             ];
         }
     }
+
+    /**
+     * Update phone number voice/recording settings
+     * Uses the Telnyx API endpoint: PATCH /phone_numbers/:id/voice
+     */
+    public function updatePhoneNumberRecordingSettings(string $phoneNumberId, array $settings): array
+    {
+        try {
+            $updateData = [];
+
+            // Map our field names to Telnyx API field names
+            if (isset($settings['inbound_call_recording_enabled'])) {
+                $updateData['inbound_call_recording_enabled'] = (bool) $settings['inbound_call_recording_enabled'];
+            }
+            if (isset($settings['inbound_call_recording_format'])) {
+                $updateData['inbound_call_recording_format'] = $settings['inbound_call_recording_format'];
+            }
+            if (isset($settings['inbound_call_recording_channels'])) {
+                $updateData['inbound_call_recording_channels'] = $settings['inbound_call_recording_channels'];
+            }
+
+            // Update using the PhoneNumber class with the voice settings
+            $number = PhoneNumber::update($phoneNumberId, $updateData);
+
+            return [
+                'success' => true,
+                'data' => $number,
+                'message' => 'Recording settings updated successfully'
+            ];
+        } catch (ApiErrorException $e) {
+            Log::error('Telnyx Update Phone Number Recording Settings Error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
 }

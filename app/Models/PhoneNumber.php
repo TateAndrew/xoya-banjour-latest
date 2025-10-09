@@ -30,6 +30,9 @@ class PhoneNumber extends Model
         'metadata',
         'messaging_profile_id',
         'assigned_to_profile_at',
+        'inbound_call_recording_enabled',
+        'inbound_call_recording_format',
+        'inbound_call_recording_channels',
     ];
 
     protected $casts = [
@@ -40,6 +43,7 @@ class PhoneNumber extends Model
         'purchased_at' => 'datetime',
         'expires_at' => 'datetime',
         'assigned_to_profile_at' => 'datetime',
+        'inbound_call_recording_enabled' => 'boolean',
     ];
 
     public function user(): BelongsTo
@@ -92,6 +96,29 @@ class PhoneNumber extends Model
     public function getFormattedNumberAttribute(): string
     {
         return '+' . $this->country_code . ' ' . $this->phone_number;
+    }
+
+    /**
+     * Get phone number in E.164 format for API calls.
+     */
+    public function getE164Attribute(): string
+    {
+        $number = $this->phone_number;
+        
+        // Remove any non-numeric characters
+        $number = preg_replace('/[^0-9]/', '', $number);
+        
+        // If number doesn't start with country code, add it
+        if (!str_starts_with($number, $this->country_code)) {
+            $number = $this->country_code . $number;
+        }
+        
+        // Ensure it starts with +
+        if (!str_starts_with($number, '+')) {
+            $number = '+' . $number;
+        }
+        
+        return $number;
     }
 
     public function isAssignedToSipTrunk(): bool

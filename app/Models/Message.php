@@ -15,13 +15,20 @@ class Message extends Model
         'status',
         'sent_at',
         'delivered_at',
+        'failed_at',
+        'error_message',
     ];
 
     protected $casts = [
         'sent_at' => 'datetime',
         'delivered_at' => 'datetime',
+        'failed_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+    ];
+
+    protected $appends = [
+        'short_content',
     ];
 
     /**
