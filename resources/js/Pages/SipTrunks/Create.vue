@@ -33,8 +33,11 @@
                                             v-model="form.webhook_url"
                                             type="url"
                                             class="mt-1 block w-full"
-                                            placeholder="https://your-domain.com/webhook"
+                                            placeholder="https://your-domain.com/webhook/call"
                                         />
+                                        <p class="mt-1 text-sm text-gray-500">
+                                            Default webhook endpoint for handling Telnyx call events
+                                        </p>
                                         <InputError :message="form.errors.webhook_url" class="mt-2" />
                                     </div>
 
@@ -737,7 +740,7 @@ const props = defineProps({
 
 const form = useForm({
     name: '',
-    webhook_url: '',
+    webhook_url: window.location.origin + '/webhook/call',
     notes: '',
     password: '',
     user_name: '',

@@ -43,6 +43,7 @@ class MessagingProfileController extends Controller
     {
         return Inertia::render('MessagingProfiles/Create', [
             'countries' => $this->getCountryOptions(),
+            'defaultWebhookUrl' => url('/webhooks/telnyx/sms'),
         ]);
     }
 

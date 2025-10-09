@@ -115,17 +115,19 @@
                                         <div class="text-lg font-bold text-blue-800">{{ fromNumber }}</div>
                                     </div> -->
                                     
-                                    <!-- Incoming Call Number Display -->
-                                    <div v-if="isIncomingCall && toNumber" class="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                        <div class="text-sm text-green-600 font-medium mb-1">Incoming From</div>
-                                        <div class="text-lg font-bold text-green-800">{{ toNumber }}</div>
-                                    </div>
-                                    
-                                    <!-- Outgoing Call Number Display -->
-                                    <div v-if="!isIncomingCall && toNumber && (isCallActive || isRinging || isConnecting)" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                        <div class="text-sm text-blue-600 font-medium mb-1">Calling To</div>
-                                        <div class="text-lg font-bold text-blue-800">{{ toNumber }}</div>
-                                    </div>
+                    <!-- Incoming Call Number Display -->
+                    <div v-if="isIncomingCall && toNumber" class="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div class="text-sm text-green-600 font-medium mb-1">Incoming From</div>
+                        <div class="text-lg font-bold text-green-800">{{ toNumber }}</div>
+                        <div v-if="fromNumber" class="text-xs text-green-600 mt-1">To: {{ fromNumber }}</div>
+                    </div>
+                    
+                    <!-- Outgoing Call Number Display -->
+                    <div v-if="!isIncomingCall && toNumber && (isCallActive || isRinging || isConnecting)" class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="text-sm text-blue-600 font-medium mb-1">Calling To</div>
+                        <div class="text-lg font-bold text-blue-800">{{ toNumber }}</div>
+                        <!-- <div v-if="fromNumber" class="text-xs text-blue-600 mt-1">From: {{ fromNumber }}</div> -->
+                    </div>
                                     
                                     <p v-if="callDuration" class="text-2xl font-mono text-blue-600 font-bold tracking-wider">{{ callDuration }}</p>
                                 </div>
@@ -236,8 +238,8 @@
                                     <p class="text-gray-600">Professional calling with WebRTC</p>
                                 </div> -->
 
-                                <!-- Connection Selection -->
-                                <div>
+                                <!-- Connection Selection - Hide during incoming call -->
+                                <div v-if="!isIncomingCall">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">SIP Connection</label>
                                     <select v-model="selectedConnection" 
                                             @change="onConnectionChange"
@@ -291,8 +293,8 @@
                                     </div>
                                 </div> -->
 
-                                <!-- Phone Numbers -->
-                                <div class="space-y-4">
+                                <!-- Phone Numbers - Hide during incoming call -->
+                                <div v-if="!isIncomingCall" class="space-y-4">
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-2">
                                             From Number (SIP Connection Assignment)
@@ -336,8 +338,8 @@
                                     </div>
                                 </div>
 
-                                <!-- Beautiful Telnyx Dialpad -->
-                                <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 shadow-inner">
+                                <!-- Beautiful Telnyx Dialpad - Hide during incoming call -->
+                                <div v-if="!isIncomingCall" class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 shadow-inner">
                                     <h4 class="text-lg font-bold text-gray-800 mb-4 text-center">
                                         {{ isCallActive ? '📱 DTMF Keypad' : '📞 Dialer' }}
                                     </h4>
@@ -412,8 +414,9 @@
                                     </div>
                                 </div>
 
-                                <!-- Beautiful Call Button -->
-                                <button @click="startCall" 
+                                <!-- Beautiful Call Button - Hide during incoming call -->
+                                <button v-if="!isIncomingCall"
+                                        @click="startCall" 
                                         :disabled="!canMakeCall || isConnecting"
                                         class="w-full py-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed text-xl font-bold shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 transition-all duration-200">
                                     <div class="flex items-center justify-center space-x-3">
@@ -423,8 +426,8 @@
                                     </div>
                                 </button>
 
-                                <!-- Connection Status -->
-                                <div class="bg-gray-50 rounded-lg p-4">
+                                <!-- Connection Status - Hide during incoming call -->
+                                <div v-if="!isIncomingCall" class="bg-gray-50 rounded-lg p-4">
                                     <h4 class="text-sm font-medium text-gray-900 mb-3">Connection Status</h4>
                                     <div class="space-y-2 text-sm">
                                         <div class="flex justify-between items-center">
@@ -600,6 +603,7 @@ let callTimer = null
 let webrtcClient = null
 let currentCall = null
 let localStream = null
+let ringingAudio = null
 
 // Computed properties
 const canMakeCall = computed(() => {
@@ -797,6 +801,46 @@ const playNotificationSound = (type) => {
         audio.play().catch(e => {})
     } catch (error) {
         // Audio notification error handled silently
+    }
+}
+
+// Play continuous ringing sound for incoming calls
+const playRingingSound = () => {
+    try {
+        // Stop any existing ringing
+        stopRingingSound()
+        
+        // Create audio element for ringing
+        ringingAudio = new Audio()
+        
+        // Use local ringtone file
+        ringingAudio.src = '/ringtone/phone_ringing.mp3'
+        ringingAudio.loop = true
+        ringingAudio.volume = 0.5
+        
+        // Play the ringing sound
+        ringingAudio.play().catch(error => {
+            console.error('Failed to play ringing sound:', error)
+            addTranscriptEntry('System', 'Ringing sound failed to play - browser may require user interaction first')
+        })
+        
+        addTranscriptEntry('System', '🔔 Ringing sound started')
+    } catch (error) {
+        console.error('Ringing sound error:', error)
+    }
+}
+
+// Stop the ringing sound
+const stopRingingSound = () => {
+    try {
+        if (ringingAudio) {
+            ringingAudio.pause()
+            ringingAudio.currentTime = 0
+            ringingAudio = null
+            addTranscriptEntry('System', '🔕 Ringing sound stopped')
+        }
+    } catch (error) {
+        console.error('Error stopping ringing sound:', error)
     }
 }
 
@@ -999,12 +1043,21 @@ const initializeWebRTC = async () => {
             
             // Handle incoming calls - official way according to docs
             if (notification.type === 'callUpdate' && notification.call.state === 'ringing') {
-                // Extract caller number from call.options first, then fallback to call.params
-                const callerNumber = notification.call.options?.callerNumber || 
-                                   notification.call.options?.remoteCallerNumber || 
+                // IMPORTANT: For incoming calls, remoteCallerNumber is the EXTERNAL caller
+                const callerNumber = notification.call.options?.remoteCallerNumber || 
+                                   notification.call.options?.callerNumber || 
                                    notification.call.params?.caller_id_number || 
                                    'Unknown'
-                addTranscriptEntry('System', `📞 Incoming call from ${callerNumber}`)
+                const destinationNumber = notification.call.options?.destinationNumber || 
+                                        notification.call.params?.destination_number || 
+                                        'Unknown'
+                
+                addTranscriptEntry('System', `📞 Incoming call from ${callerNumber} to ${destinationNumber}`)
+                addTranscriptEntry('Debug', `Raw notification - Type: ${notification.type}, State: ${notification.call.state}`)
+                addTranscriptEntry('Debug', `Remote Caller: ${notification.call.options?.remoteCallerNumber}`)
+                addTranscriptEntry('Debug', `Caller: ${notification.call.options?.callerNumber}`)
+                addTranscriptEntry('Debug', `Destination: ${notification.call.options?.destinationNumber}`)
+                
                 showCallNotification('📞 Incoming Call', `Call from ${callerNumber}`, 'info')
                 handleIncomingCall(notification.call)
             }
@@ -1034,24 +1087,37 @@ const handleIncomingCall = (call) => {
         isIncomingCall.value = true // Mark as incoming call
         callDirection.value = 'incoming'
         
+        // Start playing ringing sound
+        playRingingSound()
+        
         // Extract caller information from the call.options object
         if (call && call.options) {
-            // For incoming calls:
-            // - callerNumber: The number calling us (incoming caller)
-            // - destinationNumber: Our number that they called
-            // - remoteCallerNumber: Also the incoming caller's number
+            // For incoming calls in Telnyx WebRTC:
+            // - remoteCallerNumber: The EXTERNAL person calling you (THIS IS WHAT WE WANT!)
+            // - callerNumber: Often your own number (confusing naming)
+            // - destinationNumber: Your number that they called
             // - remoteCallerName: The caller's name if available
             
-            if (call.options.callerNumber || call.options.remoteCallerNumber) {
-                toNumber.value = call.options.callerNumber || call.options.remoteCallerNumber
+            // IMPORTANT: For incoming calls, prioritize remoteCallerNumber!
+            const incomingCallerNumber = call.options.remoteCallerNumber || call.options.callerNumber
+            const ourNumber = call.options.destinationNumber || call.options.callerNumber
+            
+            addTranscriptEntry('Debug', `📞 Incoming call - Remote caller: ${call.options.remoteCallerNumber}, Caller: ${call.options.callerNumber}, Destination: ${call.options.destinationNumber}`)
+            
+            // Set toNumber to the REMOTE caller (person calling us from outside)
+            if (incomingCallerNumber) {
+                toNumber.value = incomingCallerNumber
+                addTranscriptEntry('Debug', `✅ Set incoming caller to: ${incomingCallerNumber}`)
             }
             
-            if (call.options.destinationNumber) {
-                fromNumber.value = call.options.destinationNumber
+            // Set fromNumber to our number (the number they called)
+            if (ourNumber) {
+                fromNumber.value = ourNumber
+                addTranscriptEntry('Debug', `✅ Set our number to: ${ourNumber}`)
             }
             
-            // Log the call options for debugging
-            addTranscriptEntry('Debug', `Call options: ${JSON.stringify({
+            // Log full call options for debugging
+            addTranscriptEntry('Debug', `Full call options: ${JSON.stringify({
                 callerNumber: call.options.callerNumber,
                 destinationNumber: call.options.destinationNumber,
                 remoteCallerNumber: call.options.remoteCallerNumber,
@@ -1062,6 +1128,8 @@ const handleIncomingCall = (call) => {
         
         // Fallback to call.params if options are not available
         if (call && call.params && !toNumber.value) {
+            addTranscriptEntry('Debug', `Using fallback call.params - caller_id: ${call.params.caller_id_number}, dest: ${call.params.destination_number}`)
+            
             if (call.params.caller_id_number) {
                 toNumber.value = call.params.caller_id_number
             }
@@ -1298,9 +1366,9 @@ const toggleMute = () => {
 }
 
 const answerCall = () => {  
-
-    
     try {
+        // Stop ringing sound
+        stopRingingSound()
         
         if (currentCall) {
             currentCall.answer()
@@ -1371,6 +1439,9 @@ const simulateIncomingCall = () => {
 
 const rejectCall = () => {
     try {
+        // Stop ringing sound
+        stopRingingSound()
+        
        if (currentCall && currentCall.gotAnswer == false) {
             // Check if call is still in a valid state for hangup
             const validStatesForHangup = ['new', 'trying', 'ringing', 'early']
@@ -1420,6 +1491,9 @@ const toggleHold = async () => {
 
 const endCall = (skipHangup = false) => {
     try {
+        // Stop ringing sound if playing
+        stopRingingSound()
+        
         if (currentCall ) {
             // Check if call is still in a valid state for hangup
             const validStatesForHangup = ['new', 'trying', 'ringing', 'early', 'active', 'held']
@@ -1558,6 +1632,9 @@ const resetCallStates = () => {
 
 const disconnectCall = () => {
     try {
+        // Stop ringing sound
+        stopRingingSound()
+        
         addTranscriptEntry('Control', 'Call disconnected by user')
         showCallNotification('🔌 Call Disconnected', 'Call has been disconnected', 'info')
 
@@ -1689,6 +1766,9 @@ const toggleMoreOptions = () => {
 }
 
 onUnmounted(() => {
+    // Stop ringing sound on component unmount
+    stopRingingSound()
+    
     if (callTimer) {
         clearInterval(callTimer)
     }

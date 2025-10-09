@@ -411,14 +411,15 @@ import Toast from '@/Components/Toast.vue'
 
 const props = defineProps({
     countries: Array,
-    errors: Object
+    errors: Object,
+    defaultWebhookUrl: String
 })
 
 const form = reactive({
     name: '',
     whitelisted_destinations: [],
     enabled: true,
-    webhook_url: '',
+    webhook_url: props.defaultWebhookUrl || '',
     webhook_failover_url: '',
     webhook_api_version: '2',
     number_pool_settings: null,
