@@ -1168,9 +1168,6 @@ const initializeWebRTC = async () => {
         
         addTranscriptEntry('Error', `WebRTC initialization failed: ${error.message}`)
         addTranscriptEntry('Error', `Full error: ${error.stack || error.toString()}`)
-        
-        // Show alert to user
-        alert(`WebRTC Failed to Initialize:\n\n${error.message}\n\nCheck console for details.`)
     }
 }
 
@@ -1780,10 +1777,6 @@ onMounted(() => {
                     const confidenceText = e.confidence ? ` (${Math.round(e.confidence * 100)}%)` : ''
                     const finalText = e.is_final ? ' [FINAL]' : ' [INTERIM]'
                     addTranscriptEntry('Transcription', `${e.latest_transcript}${confidenceText}`)
-                }
-                // Show alert notification for final transcripts
-                if (e.is_final) {
-                    alert(`Transcription completed: ${e.latest_transcript}`)
                 }
             })
 
