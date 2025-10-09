@@ -263,7 +263,14 @@ class WebhookController extends Controller
                     ]);
 
                     // Broadcast message status update
-                    // event(new \App\Events\MessageSent($message));
+                    $conversation = $message->conversation;
+                    if ($conversation) {
+                        event(new \App\Events\MessageSent($message, $conversation));
+                        Log::info('Pusher event dispatched for outbound message', [
+                            'message_id' => $message->id,
+                            'conversation_id' => $conversation->id
+                        ]);
+                    }
                 } 
                 else {
                     Log::warning('Message.finalized received for unknown outbound message', [
@@ -360,7 +367,12 @@ class WebhookController extends Controller
                 ]);
 
                 // Broadcast event for real-time updates
-                // event(new \App\Events\MessageReceived($conversation, $message, $phoneNumber->user_id));
+                event(new \App\Events\MessageReceived($message, $conversation, $phoneNumber->user_id));
+                Log::info('Pusher event dispatched for inbound message', [
+                    'message_id' => $message->id,
+                    'conversation_id' => $conversation->id,
+                    'user_id' => $phoneNumber->user_id
+                ]);
             } else {
                 Log::info('Inbound message already exists', [
                     'message_id' => $existingMessage->id,
@@ -396,6 +408,16 @@ class WebhookController extends Controller
                     'message_id' => $message->id,
                     'telnyx_id' => $telnyxId
                 ]);
+
+                // Broadcast message status update
+                $conversation = $message->conversation;
+                if ($conversation) {
+                    event(new \App\Events\MessageSent($message, $conversation));
+                    Log::info('Pusher event dispatched for sent message', [
+                        'message_id' => $message->id,
+                        'conversation_id' => $conversation->id
+                    ]);
+                }
             }
         } catch (\Exception $e) {
             Log::error('Error processing message.sent: ' . $e->getMessage(), [
@@ -424,6 +446,16 @@ class WebhookController extends Controller
                     'message_id' => $message->id,
                     'telnyx_id' => $telnyxId
                 ]);
+
+                // Broadcast message status update
+                $conversation = $message->conversation;
+                if ($conversation) {
+                    event(new \App\Events\MessageSent($message, $conversation));
+                    Log::info('Pusher event dispatched for delivered message', [
+                        'message_id' => $message->id,
+                        'conversation_id' => $conversation->id
+                    ]);
+                }
             }
         } catch (\Exception $e) {
             Log::error('Error processing message.delivered: ' . $e->getMessage(), [
