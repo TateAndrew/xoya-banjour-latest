@@ -7,12 +7,14 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\PhoneNumber;
 use App\Models\MessagingProfile;
+use App\Models\User;
 use App\Services\TelnyxService;
 use App\Events\MessageSent;
 use App\Events\MessageReceived;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 
 class SmsController extends Controller
@@ -41,75 +43,23 @@ class SmsController extends Controller
                 
         $userPhoneNumbersList = $userPhoneNumbers->pluck('phone_number')->toArray();
         
-        Log::info('Loading messenger for user', [
-            'user_id' => $user->id,
-            'user_numbers' => $userPhoneNumbersList
-        ]);
-        
-        // Get conversations where user is either the sender OR the recipient
-        // 1. Conversations where sender_number is one of user's numbers (you initiated)
-        // 2. OR where contact.phone_e164 is one of user's numbers (sent to you)
+        // Get conversations
         $conversations = Conversation::where(function($query) use ($userPhoneNumbersList) {
-                // Conversations you initiated
                 $query->whereIn('sender_number', $userPhoneNumbersList);
-                    // OR conversations sent to you (contact is actually your number)
-                    // ->orWhereHas('contact', function($q) use ($userPhoneNumbersList) {
-                    //     $q->whereIn('phone_e164', $userPhoneNumbersList);
-                    // });
             })
             ->with([
-                'contact', 
+                'contact',
                 'messages' => function($query) {
-                    $query->orderBy('created_at', 'asc');
+                    $query->orderBy('created_at', 'desc')->take(1);
                 }
             ])
             ->orderBy('last_message_at', 'desc')
             ->get();
-            
-        Log::info('Found conversations', [
-            'count' => $conversations->count(),
-            'conversation_ids' => $conversations->pluck('id')->toArray()
-        ]);
-            
-        // Transform conversations to include message details with direction info
-        $conversations = $conversations->map(function($conversation) use ($userPhoneNumbersList) {
-            
-            // Determine if this is a conversation where the contact is actually your number
-            $contactIsYourNumber = in_array($conversation->contact->phone_e164, $userPhoneNumbersList);
-            
-            // Add metadata to each message to indicate if it's from user or contact
-            $conversation->messages = $conversation->messages->map(function($message) use ($userPhoneNumbersList, $conversation, $contactIsYourNumber) {
-                
-                // If contact is your number (someone sent TO you), reverse the logic
-                if ($contactIsYourNumber) {
-                    $message->is_from_user = $message->direction === Message::DIRECTION_INBOUND;
-                    $message->is_from_contact = $message->direction === Message::DIRECTION_OUTBOUND;
-                    $message->sender_name = $message->is_from_contact ? ($conversation->contact->name ?? $conversation->sender_number) : 'You';
-                } else {
-                    // Normal case: contact is external
-                    $message->is_from_user = $message->direction === Message::DIRECTION_OUTBOUND;
-                    $message->is_from_contact = $message->direction === Message::DIRECTION_INBOUND;
-                    $message->sender_name = $message->is_from_user ? 'You' : ($conversation->contact->name ?? $conversation->contact->phone_e164);
-                }
-                
-                return $message;
-            });
-            
-            // Add flag to conversation
-            $conversation->contact_is_internal = $contactIsYourNumber;
-            
-            // If contact is internal (your number), show the sender_number as the contact display
-            if ($contactIsYourNumber) {
-                $conversation->display_name = $conversation->sender_number;
-            } else {
-                $conversation->display_name = $conversation->contact->name ?? $conversation->contact->phone_e164;
-            }
-            
-            return $conversation;
-        });
-        
-        return Inertia::render('Messenger/Index', [
-            'conversations' => $conversations,
+
+        $conversations = $this->enrichConversations($conversations, $userPhoneNumbersList);
+
+        return Inertia::render('Messenger/Modern', [
+            'conversations' => $conversations->values(),
             'userPhoneNumbers' => $userPhoneNumbers,
             'hasPhoneNumbers' => $userPhoneNumbers->count() > 0
         ]);
@@ -180,7 +130,6 @@ class SmsController extends Controller
                 'content' => 'required|string|max:1600',
                 'from_phone_number_id' => 'required|exists:phone_numbers,id'
             ]);
-            
             $user = Auth::user();
             $contact = Contact::findOrFail($request->contact_id);
             
@@ -210,12 +159,6 @@ class SmsController extends Controller
                 ->where('status', 'assigned')
                 ->first();
                 
-            Log::info('Checking if recipient is internal user', [
-                'contact_phone' => $contact->phone_e164,
-                'contact_clean' => $contactE164Clean,
-                'found_recipient' => $recipientPhoneNumber ? 'yes' : 'no',
-                'recipient_id' => $recipientPhoneNumber?->id
-            ]);
 
             $isInternalMessage = !is_null($recipientPhoneNumber);
 
@@ -284,33 +227,33 @@ class SmsController extends Controller
                 ]);
 
                 // Send via Telnyx using user's phone number and messaging profile
-                $response = $this->telnyxService->sendSms(
-                    $contact->phone_e164,
-                    $request->content,
-                    $phoneNumber->e164, // Use E.164 formatted number
-                    $phoneNumber->messagingProfile->telnyx_profile_id
-                );
+                // $response = $this->telnyxService->sendSms(
+                //     $contact->phone_e164,
+                //     $request->content,
+                //     $phoneNumber->e164, // Use E.164 formatted number
+                //     $phoneNumber->messagingProfile->telnyx_profile_id
+                // );
                 
-                if ($response && $response['success'] && isset($response['data']['data']['id'])) {
-                    $message->update([
-                        'telnyx_message_id' => $response['data']['data']['id'],
-                        'status' => Message::STATUS_SENDING
-                    ]);
-                } else {
-                    // If no valid response, mark message as failed
-                    $message->update([
-                        'status' => Message::STATUS_FAILED
-                    ]);
+                // if ($response && $response['success'] && isset($response['data']['data']['id'])) {
+                //     $message->update([
+                //         'telnyx_message_id' => $response['data']['data']['id'],
+                //         'status' => Message::STATUS_SENDING
+                //     ]);
+                // } else {
+                //     // If no valid response, mark message as failed
+                //     $message->update([
+                //         'status' => Message::STATUS_FAILED
+                //     ]);
                     
-                    $errorMessage = isset($response['error']) 
-                        ? 'Failed to send message: ' . $response['error']
-                        : 'Failed to send message. Invalid response from Telnyx.';
+                //     $errorMessage = isset($response['error']) 
+                //         ? 'Failed to send message: ' . $response['error']
+                //         : 'Failed to send message. Invalid response from Telnyx.';
                     
-                    return response()->json([
-                        'success' => false,
-                        'message' => $errorMessage
-                    ], 500);
-                }
+                //     return response()->json([
+                //         'success' => false,
+                //         'message' => $errorMessage
+                //     ], 500);
+                // }
             }
             
             // Update conversation
@@ -367,6 +310,56 @@ class SmsController extends Controller
     }
 
     /**
+     * Get internal users with messaging-enabled phone numbers.
+     */
+    public function getInternalUsers(Request $request)
+    {
+        $search = $request->get('search', $request->get('q'));
+
+        $users = User::query()
+            ->whereHas('phoneNumbers', function ($query) {
+                $query->where('status', 'assigned')
+                      ->whereNotNull('messaging_profile_id');
+            })
+            ->with(['phoneNumbers' => function ($query) {
+                $query->where('status', 'assigned')
+                      ->whereNotNull('messaging_profile_id')
+                      ->orderBy('phone_number');
+            }]);
+
+        if (!empty($search)) {
+            $users->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        $results = $users->orderBy('name')
+            ->limit(25)
+            ->get()
+            ->map(function (User $user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'phone_numbers' => $user->phoneNumbers->map(function (PhoneNumber $phoneNumber) {
+                        return [
+                            'id' => $phoneNumber->id,
+                            'phone_number' => $phoneNumber->phone_number,
+                            'e164' => $phoneNumber->e164,
+                            'messaging_profile' => $phoneNumber->messagingProfile ? [
+                                'id' => $phoneNumber->messagingProfile->id,
+                                'name' => $phoneNumber->messagingProfile->name,
+                            ] : null,
+                        ];
+                    })->values(),
+                ];
+            });
+
+        return response()->json($results);
+    }
+
+    /**
      * Store a new contact.
      */
     public function storeContact(Request $request)
@@ -385,29 +378,90 @@ class SmsController extends Controller
      */
     public function startConversation(Request $request)
     {
+        $contactMode = $request->input('contact_mode', $request->input('contactMode', 'new'));
+
         try {
-            $request->validate([
-                'name' => 'nullable|string|max:191',
-                'phone_e164' => 'required|string',
+            $rules = [
+                'contact_mode' => 'nullable|string|in:new,internal',
                 'message' => 'required|string|max:1600',
-                'from_phone_number_id' => 'required|exists:phone_numbers,id'
-            ]);
+                'from_phone_number_id' => 'required|exists:phone_numbers,id',
+            ];
+
+            if ($contactMode === 'internal') {
+                $rules['internal_user_id'] = 'required|exists:users,id';
+                $rules['internal_user_phone_number_id'] = 'nullable|exists:phone_numbers,id';
+            } else {
+                $rules['name'] = 'nullable|string|max:191';
+                $rules['phone_e164'] = 'required|string';
+            }
+
+            $validated = $request->validate($rules);
           
             $user = Auth::user();
             
             // Get the user's phone number with messaging profile
             $phoneNumber = PhoneNumber::where('user_id', $user->id)
-                ->where('id', $request->from_phone_number_id)
+                ->where('id', $validated['from_phone_number_id'])
                 ->where('status', 'assigned')
                 ->whereNotNull('messaging_profile_id')
                 ->with(['messagingProfile'])
                 ->firstOrFail();
-                
+
+            $isInternalMode = $contactMode === 'internal';
+            $contactName = $validated['name'] ?? null;
+            $contactPhoneE164 = $validated['phone_e164'] ?? null;
+            $recipientPhoneNumber = null;
+            $targetInternalUser = null;
+
+            if ($isInternalMode) {
+                $targetInternalUser = User::with(['phoneNumbers' => function($query) {
+                        $query->where('status', 'assigned')
+                              ->whereNotNull('messaging_profile_id');
+                    }])
+                    ->findOrFail($validated['internal_user_id']);
+
+                if ($targetInternalUser->phoneNumbers->isEmpty()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'The selected user does not have an assigned messaging phone number.'
+                    ], 422);
+                }
+
+                if (!empty($validated['internal_user_phone_number_id'])) {
+                    $recipientPhoneNumber = $targetInternalUser->phoneNumbers
+                        ->firstWhere('id', (int) $validated['internal_user_phone_number_id']);
+
+                    if (!$recipientPhoneNumber) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'The selected phone number does not belong to the specified user.'
+                        ], 422);
+                    }
+                } else {
+                    $recipientPhoneNumber = $targetInternalUser->phoneNumbers->first();
+                }
+
+                if (!$recipientPhoneNumber) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Unable to determine a destination phone number for the selected user.'
+                    ], 422);
+                }
+
+                $contactPhoneE164 = $recipientPhoneNumber->phone_number ?? $recipientPhoneNumber->e164;
+                $contactName = $targetInternalUser->name;
+            }
+            
             // Create or get contact
             $contact = Contact::firstOrCreate(
-                ['phone_e164' => $request->phone_e164],
-                ['name' => $request->name]
+                ['phone_e164' => $contactPhoneE164],
+                ['name' => $contactName]
             );
+
+            if ($isInternalMode && $targetInternalUser && $targetInternalUser->name && $contact->name !== $targetInternalUser->name) {
+                $contact->name = $targetInternalUser->name;
+                $contact->save();
+            }
             
             // Get or create conversation
             $conversation = Conversation::firstOrCreate([
@@ -419,18 +473,21 @@ class SmsController extends Controller
             // Normalize the contact phone number for comparison
             $contactE164Clean = preg_replace('/[^0-9]/', '', $contact->phone_e164);
             
-            $recipientPhoneNumber = PhoneNumber::where(function($query) use ($contact, $contactE164Clean) {
-                    $query->where('phone_number', $contact->phone_e164)
-                          ->orWhere('phone_number', '+' . $contactE164Clean)
-                          ->orWhereRaw('REPLACE(REPLACE(REPLACE(phone_number, "+", ""), "-", ""), " ", "") = ?', [$contactE164Clean]);
-                })
-                ->where('status', 'assigned')
-                ->first();
+            if (!$recipientPhoneNumber) {
+                $recipientPhoneNumber = PhoneNumber::where(function($query) use ($contact, $contactE164Clean) {
+                        $query->where('phone_number', $contact->phone_e164)
+                              ->orWhere('phone_number', '+' . $contactE164Clean)
+                              ->orWhereRaw('REPLACE(REPLACE(REPLACE(phone_number, "+", ""), "-", ""), " ", "") = ?', [$contactE164Clean]);
+                    })
+                    ->where('status', 'assigned')
+                    ->first();
+            }
                 
             Log::info('Start conversation - checking if recipient is internal user', [
                 'contact_phone' => $contact->phone_e164,
                 'found_recipient' => $recipientPhoneNumber ? 'yes' : 'no',
-                'recipient_id' => $recipientPhoneNumber?->id
+                'recipient_id' => $recipientPhoneNumber?->id,
+                'contact_mode' => $contactMode
             ]);
 
             $isInternalMessage = !is_null($recipientPhoneNumber);
@@ -446,7 +503,7 @@ class SmsController extends Controller
                 // Create message record with delivered status (no external SMS needed)
                 $message = $conversation->messages()->create([
                     'direction' => Message::DIRECTION_OUTBOUND,
-                    'content' => $request->message,
+                    'content' => $validated['message'],
                     'status' => Message::STATUS_DELIVERED,
                     'sent_at' => now(),
                     'delivered_at' => now()
@@ -467,7 +524,7 @@ class SmsController extends Controller
                 // Create the same message in the reciprocal conversation (from recipient's view it's inbound)
                 $reciprocalMessage = $reciprocalConversation->messages()->create([
                     'direction' => Message::DIRECTION_INBOUND, // For recipient, it's inbound
-                    'content' => $request->message,
+                    'content' => $validated['message'],
                     'status' => Message::STATUS_DELIVERED,
                     'sent_at' => now(),
                     'delivered_at' => now()
@@ -497,14 +554,13 @@ class SmsController extends Controller
                 // Create message record
                 $message = $conversation->messages()->create([
                     'direction' => Message::DIRECTION_OUTBOUND,
-                    'content' => $request->message,
+                    'content' => $validated['message'],
                     'status' => Message::STATUS_QUEUED
                 ]);
                 
-                // Send via Telnyx using user's phone number and messaging profile
                 $response = $this->telnyxService->sendSms(
                     $contact->phone_e164,
-                    $request->message,
+                    $validated['message'],
                     $phoneNumber->e164, // Use E.164 formatted number
                     $phoneNumber->messagingProfile->telnyx_profile_id
                 );
@@ -540,9 +596,24 @@ class SmsController extends Controller
             // Broadcast to sender
             event(new MessageSent($message, $conversation));
 
+            $conversation->load([
+                'contact',
+                'messages' => function($query) {
+                    $query->orderBy('created_at', 'desc')->take(1);
+                }
+            ]);
+
+            $userPhoneNumbersList = PhoneNumber::where('user_id', $user->id)
+                ->where('status', 'assigned')
+                ->whereNotNull('messaging_profile_id')
+                ->pluck('phone_number')
+                ->toArray();
+
+            $preparedConversation = $this->enrichConversations(collect([$conversation]), $userPhoneNumbersList)->first();
+
             return response()->json([
                 'success' => true, 
-                'conversation' => $conversation->load(['contact', 'lastMessage']),
+                'conversation' => $preparedConversation,
                 'message' => $message
             ]);
             
@@ -563,6 +634,8 @@ class SmsController extends Controller
             Log::error('Start conversation error: ' . $e->getMessage(), [
                 'phone_e164' => $request->phone_e164 ?? null,
                 'from_phone_number_id' => $request->from_phone_number_id ?? null,
+                'internal_user_id' => $request->internal_user_id ?? null,
+                'contact_mode' => $contactMode,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -700,7 +773,12 @@ class SmsController extends Controller
                     //     $q->whereIn('phone_e164', $userPhoneNumbers);
                     // });
             })
-            ->with(['contact', 'lastMessage'])
+            ->with([
+                'contact',
+                'messages' => function($query) {
+                    $query->orderBy('created_at', 'desc')->take(1);
+                }
+            ])
             ->orderBy('last_message_at', 'desc')
             ->get();
             
@@ -708,6 +786,79 @@ class SmsController extends Controller
             'count' => $conversations->count()
         ]);
 
-        return response()->json($conversations);
+        $conversations = $this->enrichConversations($conversations, $userPhoneNumbers);
+
+        return response()->json($conversations->values());
+    }
+
+    /**
+     * Enrich conversation collection with additional metadata and normalized relations.
+     */
+    protected function enrichConversations(Collection $conversations, array $userPhoneNumbersList): Collection
+    {
+        $internalPhoneCache = [];
+
+        return $conversations->map(function (Conversation $conversation) use (&$internalPhoneCache, $userPhoneNumbersList) {
+            $lastMessage = null;
+
+            if ($conversation->relationLoaded('messages') && $conversation->messages->isNotEmpty()) {
+                $lastMessage = $conversation->messages->first();
+                $conversation->setRelation('messages', collect([$lastMessage]));
+            } elseif ($conversation->relationLoaded('lastMessage') && $conversation->lastMessage) {
+                $lastMessage = $conversation->lastMessage;
+                $conversation->unsetRelation('lastMessage');
+            } elseif (isset($conversation->last_message)) {
+                $lastMessage = $conversation->last_message;
+            }
+
+            $conversation->setAttribute('last_message', $lastMessage);
+
+            $contact = $conversation->contact;
+
+            if ($contact && $contact->phone_e164) {
+                $contactPhone = $contact->phone_e164;
+                $normalized = preg_replace('/[^0-9]/', '', $contactPhone);
+
+                if ($normalized !== null && $normalized !== '') {
+                    if (!array_key_exists($normalized, $internalPhoneCache)) {
+                        $internalPhoneCache[$normalized] = PhoneNumber::with('user')
+                            ->where(function($query) use ($contactPhone, $normalized) {
+                                $query->where('phone_number', $contactPhone)
+                                    ->orWhere('phone_number', '+' . $normalized)
+                                    ->orWhereRaw('REPLACE(REPLACE(REPLACE(phone_number, "+", ""), "-", ""), " ", "") = ?', [$normalized]);
+                            })
+                            ->where('status', 'assigned')
+                            ->first();
+                    }
+
+                    $internalPhoneNumber = $internalPhoneCache[$normalized];
+                    if ($internalPhoneNumber && $internalPhoneNumber->user) {
+                        $user = $internalPhoneNumber->user;
+                        $contact->setAttribute('username', $user->name);
+                        $contact->setAttribute('email', $user->email);
+                        $contact->setAttribute('user', [
+                            'id' => $user->id,
+                            'name' => $user->name,
+                            'email' => $user->email,
+                        ]);
+
+                        if (empty($contact->name)) {
+                            $contact->name = $user->name;
+                        }
+                    }
+                }
+
+                $contactIsYourNumber = in_array($contact->phone_e164, $userPhoneNumbersList, true);
+                $conversation->contact_is_internal = $contactIsYourNumber;
+                $conversation->display_name = $contactIsYourNumber
+                    ? $conversation->sender_number
+                    : ($contact->name ?? $contact->phone_e164);
+            } else {
+                $conversation->contact_is_internal = false;
+                $conversation->display_name = $conversation->sender_number;
+            }
+
+            return $conversation;
+        });
     }
 }
