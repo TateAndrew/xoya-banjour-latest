@@ -1,7 +1,7 @@
 <template>
     <Head title="Usage Reports" />
 
-    <AuthenticatedLayout>
+    <DashboardLayout>
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 Usage Reports
@@ -205,7 +205,7 @@
                 </div>
             </div>
         </div>
-    </AuthenticatedLayout>
+    </DashboardLayout>
 </template>
 
 <script setup>

@@ -1,9 +1,10 @@
 <template>
-  <AuthenticatedLayout>
+  <DashboardLayout>
     <template #header>
-      <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-        Create Permission
-      </h2>
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">Create Permission</h1>
+        <p class="text-muted-foreground">Add a new system permission</p>
+      </div>
     </template>
 
     <div class="py-12">
@@ -87,12 +88,12 @@
         </div>
       </div>
     </div>
-  </AuthenticatedLayout>
+  </DashboardLayout>
 </template>
 
 <script setup>
 import { Link, useForm } from '@inertiajs/vue3';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import DashboardLayout from '@/Layouts/DashboardLayout.vue';
 
 const form = useForm({
   name: ''

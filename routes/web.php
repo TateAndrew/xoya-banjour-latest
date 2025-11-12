@@ -15,6 +15,7 @@ use App\Http\Controllers\OutboundVoiceProfileController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\VideoCallController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -45,16 +46,30 @@ Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
+// Main Dialer - Now using Modern design
 Route::get('/dialer', function () {
+    return Inertia::render('Dialer/Modern', [
+        'phoneNumbers' => \App\Models\PhoneNumber::where('user_id', Auth::id())->get(),
+        'user' => Auth::user(),
+        'recentCalls' => []
+    ]);
+})->middleware(['auth', 'verified'])->name('dialer');
+
+// Original Dialer (kept for reference)
+Route::get('/dialer/original', function () {
     return Inertia::render('Dialer/Index', [
         'phoneNumbers' => \App\Models\PhoneNumber::where('user_id', Auth::id())->get(),
         'user' => Auth::user()
     ]);
-})->middleware(['auth', 'verified'])->name('dialer');
+})->middleware(['auth', 'verified'])->name('dialer.original');
 
 Route::get('/dialer/history', function () {
     return Inertia::render('Dialer/History');
 })->middleware(['auth', 'verified'])->name('dialer.history');
+
+Route::get('/dialer/showcase', function () {
+    return Inertia::render('Dialer/Showcase');
+})->middleware(['auth', 'verified'])->name('dialer.showcase');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -183,7 +198,12 @@ Route::middleware('auth')->group(function () {
 
 // SMS Messenger Routes
 Route::middleware(['auth'])->group(function () {
+    // Main Messenger - Now using Modern design
     Route::get('/messenger', [SmsController::class, 'index'])->name('messenger.index');
+    
+    // Original Messenger (kept for reference)
+    Route::get('/messenger/original', [SmsController::class, 'index'])->name('messenger.original');
+    
     Route::get('/messenger/test', function () {
         return Inertia::render('Messenger/Test');
     })->name('messenger.test');
@@ -192,6 +212,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/messenger/start-conversation', [SmsController::class, 'startConversation'])->name('messenger.start-conversation');
     Route::get('/messenger/contacts', [SmsController::class, 'getContacts'])->name('messenger.contacts');
     Route::post('/messenger/contacts', [SmsController::class, 'storeContact'])->name('messenger.contacts.store');
+    Route::get('/messenger/internal-users', [SmsController::class, 'getInternalUsers'])->name('messenger.internal-users');
     Route::post('/messenger/conversation/{conversation}/read', [SmsController::class, 'markAsRead'])->name('messenger.mark-as-read');
     Route::get('/messenger/conversation/{conversation}/messages', [SmsController::class, 'getMessages'])->name('messenger.messages');
     Route::get('/messenger/contacts/search', [SmsController::class, 'searchContacts'])->name('messenger.contacts.search');
@@ -210,6 +231,9 @@ Route::middleware(['auth'])->group(function () {
 // Call Recording Routes
 Route::middleware(['auth'])->group(function () {
     Route::get('/recordings', [RecordingController::class, 'index'])->name('recordings.index');
+    Route::get('/recordings/workspace', function () {
+        return Inertia::render('Recording/Transcription');
+    })->name('recordings.workspace');
     Route::get('/api/recordings', [RecordingController::class, 'list'])->name('recordings.list');
     Route::get('/api/recordings/{id}', [RecordingController::class, 'show'])->name('recordings.show');
     Route::delete('/api/recordings/{id}', [RecordingController::class, 'destroy'])->name('recordings.destroy');
@@ -263,6 +287,23 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/billing/groups', [BillingController::class, 'getBillingGroups'])->name('billing.groups');
     Route::get('/api/billing/usage', [BillingController::class, 'getUsageReports'])->name('billing.usage.reports');
     Route::get('/api/billing/payment-methods', [BillingController::class, 'getPaymentMethods'])->name('billing.payment-methods');
+});
+
+// Video Call Routes
+Route::middleware(['auth'])->group(function () {
+    // Video calling interface
+    Route::get('/video-calls', [VideoCallController::class, 'index'])->name('video-calls.index');
+    Route::get('/video-calls/join/{roomName}', [VideoCallController::class, 'joinRoom'])->name('video-call.join');
+    
+    // API endpoints for video calls
+    Route::post('/api/video-calls/create-room', [VideoCallController::class, 'createRoom'])->name('video-calls.create-room');
+    Route::post('/api/video-calls/quick-call', [VideoCallController::class, 'startQuickCall'])->name('video-calls.quick-call');
+    Route::post('/api/video-calls/create-conference', [VideoCallController::class, 'createConference'])->name('video-calls.create-conference');
+    Route::post('/api/video-calls/{id}/end', [VideoCallController::class, 'endCall'])->name('video-calls.end');
+    Route::post('/api/video-calls/{id}/status', [VideoCallController::class, 'updateStatus'])->name('video-calls.update-status');
+    Route::get('/api/video-calls/{id}', [VideoCallController::class, 'getCallDetails'])->name('video-calls.details');
+    Route::get('/api/video-calls/history', [VideoCallController::class, 'history'])->name('video-calls.history');
+    Route::delete('/api/video-calls/{id}', [VideoCallController::class, 'destroy'])->name('video-calls.destroy');
 });
 
 

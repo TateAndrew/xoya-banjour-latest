@@ -1,7 +1,7 @@
 <template>
     <Head title="Manage Phone Numbers" />
 
-    <AuthenticatedLayout>
+    <DashboardLayout>
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 Manage Phone Numbers
@@ -277,7 +277,7 @@
                 </div>
             </div>
         </div>
-    </AuthenticatedLayout>
+    </DashboardLayout>
 </template>
 
 <script setup>

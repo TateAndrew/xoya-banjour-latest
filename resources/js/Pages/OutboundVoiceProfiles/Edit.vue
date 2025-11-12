@@ -1,7 +1,7 @@
 <template>
     <Head title="Edit Outbound Voice Profile" />
 
-    <AuthenticatedLayout>
+    <DashboardLayout>
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 Edit Outbound Voice Profile
@@ -230,7 +230,7 @@
                 </div>
             </div>
         </div>
-    </AuthenticatedLayout>
+    </DashboardLayout>
 </template>
 
 <script setup>

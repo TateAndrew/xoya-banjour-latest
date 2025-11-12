@@ -1,15 +1,15 @@
 <template>
-  <AuthenticatedLayout>
+  <DashboardLayout>
     <template #header>
-      <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-        Create User
-      </h2>
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">Create User</h1>
+        <p class="text-muted-foreground">Add a new user to the system</p>
+      </div>
     </template>
 
-    <div class="py-12">
-      <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-          <div class="p-6 text-gray-900">
+    <div class="max-w-2xl">
+      <div class="bg-card overflow-hidden shadow-sm rounded-lg border">
+        <div class="p-6">
             <form @submit.prevent="submit" class="space-y-6">
               <!-- Name Field -->
               <div>
@@ -173,17 +173,16 @@
                 </PrimaryButton>
               </div>
             </form>
-          </div>
         </div>
       </div>
     </div>
-  </AuthenticatedLayout>
+  </DashboardLayout>
 </template>
 
 <script setup>
 import { useForm, usePage } from '@inertiajs/vue3'
 import { Link } from '@inertiajs/vue3'
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import DashboardLayout from '@/Layouts/DashboardLayout.vue'
 import InputError from '@/Components/InputError.vue'
 import InputLabel from '@/Components/InputLabel.vue'
 import PrimaryButton from '@/Components/PrimaryButton.vue'

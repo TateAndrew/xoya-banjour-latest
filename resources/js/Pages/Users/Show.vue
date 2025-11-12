@@ -1,15 +1,15 @@
 <template>
-  <AuthenticatedLayout>
+  <DashboardLayout>
     <template #header>
-      <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-        User Details
-      </h2>
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">User Details</h1>
+        <p class="text-muted-foreground">View complete user information</p>
+      </div>
     </template>
 
-    <div class="py-12">
-      <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-          <div class="p-6 text-gray-900">
+    <div class="max-w-4xl">
+      <div class="bg-card overflow-hidden shadow-sm rounded-lg border">
+        <div class="p-6">
             <!-- User Header -->
             <div class="flex items-center justify-between mb-6">
               <div class="flex items-center">
@@ -527,17 +527,16 @@
         </div>
       </div>
     </div>
-          </div>
         </div>
       </div>
     </div>
-  </AuthenticatedLayout>
+  </DashboardLayout>
 </template>
 
 <script setup>
 import { ref, reactive, watch } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
+import DashboardLayout from '@/Layouts/DashboardLayout.vue'
 import axios from 'axios'
 
 const props = defineProps({

@@ -1,272 +1,607 @@
 <template>
-    <Head title="Phone Numbers" />
+  <Head title="Phone Numbers" />
 
-    <AuthenticatedLayout>
-        <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Phone Numbers
-            </h2>
-        </template>
+  <DashboardLayout>
+    <template #header>
+      <div class="flex flex-col gap-2">
+        <h1 class="text-3xl font-bold tracking-tight">Phone Numbers</h1>
+        <p class="text-muted-foreground">
+          Search, purchase, and manage numbers powering your voice and messaging experiences.
+        </p>
+      </div>
+    </template>
 
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <!-- Header with Purchase Button -->
-                <div class="mb-6 flex justify-between items-center">
-                    <h3 class="text-2xl font-bold text-gray-900">Your Phone Numbers</h3>
-                    <div class="flex space-x-3">
-                        <Link 
-                            :href="route('phone-numbers.manage')" 
-                            class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-                        >
-                            Manage Numbers
-                        </Link>
-                        <Link 
-                            :href="route('phone-numbers.purchase-page')" 
-                            class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
-                        >
-                            Purchase New Number
-                        </Link>
-                    </div>
-                </div>
-
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6 text-gray-900">
-                        <!-- Quick Search Section -->
-                        <div class="mb-8">
-                            <h3 class="text-lg font-medium mb-4">Quick Search</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Country</label>
-                                    <select v-model="searchForm.country_code" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                        <option value="US">United States</option>
-                                        <option value="CA">Canada</option>
-                                        <option value="GB">United Kingdom</option>
-                                        <option value="AU">Australia</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Area Code</label>
-                                    <input v-model="searchForm.area_code" type="text" placeholder="e.g., 212" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700">Features</label>
-                                    <div class="mt-1 space-y-2">
-                                        <label class="flex items-center">
-                                            <input v-model="searchForm.features" type="checkbox" value="voice" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
-                                            <span class="ml-2 text-sm">Voice</span>
-                                        </label>
-                                        <label class="flex items-center">
-                                            <input v-model="searchForm.features" type="checkbox" value="sms" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
-                                            <span class="ml-2 text-sm">SMS</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="flex items-end">
-                                    <button @click="searchNumbers" :disabled="searching" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50">
-                                        {{ searching ? 'Searching...' : 'Search' }}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Search Results -->
-                        <div v-if="searchResults.length > 0" class="mb-8">
-                            <h3 class="text-lg font-medium mb-4">Available Numbers ({{ searchResults.length }})</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div v-for="number in searchResults" :key="number.phone_number" class="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <div class="text-lg font-semibold">{{ formatPhoneNumber(number.phone_number) }}</div>
-                                        <button @click="purchaseNumber(number)" :disabled="purchasing" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:opacity-50">
-                                            {{ purchasing ? 'Purchasing...' : 'Purchase' }}
-                                        </button>
-                                    </div>
-                                    <div class="text-sm text-gray-600">
-                                        <div class="mb-2">
-                                            <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded capitalize">
-                                                {{ number.phone_number_type }}
-                                            </span>
-                                        </div>
-                                        <div class="mb-2">
-                                            <strong>Monthly Cost:</strong> ${{ number.cost_information?.monthly_cost || 'N/A' }}
-                                        </div>
-                                        <div class="mb-2">
-                                            <strong>Setup Cost:</strong> ${{ number.cost_information?.upfront_cost || 'N/A' }}
-                                        </div>
-                                        <div class="mt-1">
-                                            <span v-for="feature in getFeatureNames(number.features)" :key="feature" class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1 mb-1">
-                                                {{ feature.toUpperCase() }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- User's Numbers -->
-                        <div v-if="userNumbers.length > 0">
-                            <h3 class="text-lg font-medium mb-4">Your Phone Numbers</h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div v-for="number in userNumbers" :key="number.id" class="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                    <div class="flex justify-between items-start mb-2">
-                                        <div class="text-lg font-semibold">{{ formatPhoneNumber(number.phone_number) }}</div>
-                                        <span class="inline-block px-2 py-1 rounded text-xs font-medium" :class="getStatusBadgeClass(number.status)">
-                                            {{ number.status }}
-                                        </span>
-                                    </div>
-                                    <div class="text-sm text-gray-600">
-                                        <div class="mt-1">
-                                            <span v-for="capability in number.capabilities" :key="capability" class="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded mr-1 mb-1">
-                                                {{ capability.toUpperCase() }}
-                                            </span>
-                                        </div>
-                                        <div class="mt-2 text-xs text-gray-500">
-                                            Purchased: {{ formatDate(number.purchased_at) }}
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Action Buttons -->
-                                    <div class="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-2">
-                                        <Link 
-                                            :href="route('phone-numbers.show', number.id)" 
-                                            class="inline-flex items-center text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                                        >
-                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                            View
-                                        </Link>
-                                        <span class="text-gray-300">|</span>
-                                        <Link 
-                                            :href="route('phone-numbers.edit-recording-settings', number.id)" 
-                                            class="inline-flex items-center text-green-600 hover:text-green-800 text-sm font-medium"
-                                        >
-                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                            </svg>
-                                            Recording
-                                        </Link>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- No Results Message -->
-                        <div v-if="searched && searchResults.length === 0" class="text-center py-8">
-                            <p class="text-gray-500">No phone numbers found matching your criteria.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="space-y-6 pb-12">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="space-y-1">
+          <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Overview
+          </p>
+          <p class="text-sm text-muted-foreground">
+            {{ totalNumbersCount }} numbers in your inventory
+          </p>
         </div>
-    </AuthenticatedLayout>
+
+        <div class="flex flex-wrap gap-2">
+          <Link
+            :href="route('phone-numbers.manage')"
+            class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition hover:bg-accent hover:text-accent-foreground"
+          >
+            <Settings class="h-4 w-4" />
+            Manage Numbers
+          </Link>
+          <Link
+            :href="route('phone-numbers.purchase-page')"
+            class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+          >
+            <ShoppingCart class="h-4 w-4" />
+            Purchase Number
+          </Link>
+        </div>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">Total Numbers</CardTitle>
+            <Phone class="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-semibold">{{ totalNumbersCount }}</div>
+            <p class="text-xs text-muted-foreground">
+              {{ voiceCapableCount }} with voice, {{ smsCapableCount }} with SMS
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">Assigned</CardTitle>
+            <ShieldCheck class="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-semibold">{{ assignedNumbersCount }}</div>
+            <p class="text-xs text-muted-foreground">Provisioned to profiles or users</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">Voice Ready</CardTitle>
+            <PhoneCall class="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-semibold">{{ voiceCapableCount }}</div>
+            <p class="text-xs text-muted-foreground">Support PSTN inbound &amp; outbound</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">SMS Ready</CardTitle>
+            <MessageCircle class="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-semibold">{{ smsCapableCount }}</div>
+            <p class="text-xs text-muted-foreground">Messaging enabled numbers</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader class="pb-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle class="flex items-center gap-2 text-base">
+                <Filter class="h-4 w-4" />
+                Search inventory
+              </CardTitle>
+              <CardDescription>
+                Filter available numbers by geography, area code, and capabilities.
+              </CardDescription>
+            </div>
+            <div class="flex items-center gap-2">
+              <Badge v-if="searchResults.length" variant="outline" class="uppercase tracking-wide">
+                {{ searchResults.length }} found
+              </Badge>
+              <Button
+                variant="ghost"
+                size="sm"
+                class="h-9 gap-2 text-muted-foreground"
+                :disabled="!searchResults.length && !searched"
+                @click="clearSearch"
+              >
+                Reset
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div class="md:col-span-1">
+              <Label class="text-xs uppercase text-muted-foreground">Country</Label>
+              <div class="mt-2">
+                <Select v-model="searchForm.country_code">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="country in countryOptions" :key="country.value" :value="country.value">
+                      {{ country.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label class="text-xs uppercase text-muted-foreground">Area code</Label>
+              <Input
+                v-model="searchForm.area_code"
+                placeholder="e.g. 212"
+                class="mt-2"
+                maxlength="6"
+              />
+            </div>
+
+            <div class="md:col-span-2">
+              <Label class="text-xs uppercase text-muted-foreground">Capabilities</Label>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <Button
+                  v-for="feature in featureOptions"
+                  :key="feature.value"
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  class="gap-2"
+                  :class="{
+                    'border-primary bg-primary/10 text-primary': isFeatureSelected(feature.value)
+                  }"
+                  @click="toggleFeature(feature.value)"
+                >
+                  <component :is="feature.icon" class="h-4 w-4" />
+                  {{ feature.label }}
+                </Button>
+              </div>
+            </div>
+
+            <div class="flex items-end">
+              <Button
+                class="w-full gap-2"
+                :disabled="searching"
+                @click="searchNumbers"
+              >
+                <Loader2 v-if="searching" class="h-4 w-4 animate-spin" />
+                <Search v-else class="h-4 w-4" />
+                {{ searching ? 'Searching…' : 'Search' }}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="flex flex-wrap items-center justify-between gap-4 pb-3">
+          <div>
+            <CardTitle class="text-lg font-semibold">Available numbers</CardTitle>
+            <CardDescription>
+              Purchase instantly to add routing and assign to messaging profiles.
+            </CardDescription>
+          </div>
+          <Badge variant="outline" class="text-xs font-medium uppercase tracking-wide">
+            {{ searchResults.length }} results
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <div
+            v-if="searchResults.length === 0"
+            class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border bg-muted/40 px-8 py-16 text-center"
+          >
+            <ShoppingCart class="h-10 w-10 text-muted-foreground" />
+            <div class="space-y-1">
+              <h3 class="text-lg font-semibold">
+                {{ searched ? 'No numbers match your filters.' : 'Use the filters above to discover numbers.' }}
+              </h3>
+              <p class="text-sm text-muted-foreground">
+                Try a different region or capability mix to see more results.
+              </p>
+            </div>
+          </div>
+
+          <div
+            v-else
+            class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+          >
+            <Card
+              v-for="number in searchResults"
+              :key="number.phone_number"
+              class="border-border/60"
+            >
+              <CardHeader class="space-y-2 pb-2">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <CardTitle class="text-lg font-semibold tracking-wide">
+                      {{ formatPhoneNumber(number.phone_number) }}
+                    </CardTitle>
+                    <CardDescription>
+                      {{ number.phone_number_type ? number.phone_number_type.toUpperCase() : 'Local' }}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    class="gap-2"
+                    :disabled="purchasingNumber === number.phone_number"
+                    @click="purchaseNumber(number)"
+                  >
+                    <Loader2
+                      v-if="purchasingNumber === number.phone_number"
+                      class="h-4 w-4 animate-spin"
+                    />
+                    <PlusCircle v-else class="h-4 w-4" />
+                    {{ purchasingNumber === number.phone_number ? 'Purchasing…' : 'Purchase' }}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent class="space-y-3 text-sm text-muted-foreground">
+                <div class="flex items-center justify-between">
+                  <span>Monthly</span>
+                  <span class="font-medium text-foreground">
+                    {{ formatCurrency(number.cost_information?.monthly_cost) }}
+                  </span>
+                </div>
+                <div class="flex items-center justify-between border-b border-border/60 pb-3">
+                  <span>Setup</span>
+                  <span class="font-medium text-foreground">
+                    {{ formatCurrency(number.cost_information?.upfront_cost) }}
+                  </span>
+                </div>
+                <div class="space-y-1">
+                  <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground/70">
+                    Capabilities
+                  </p>
+                  <div class="flex flex-wrap gap-1.5">
+                    <Badge
+                      v-for="feature in getFeatureNames(number.features)"
+                      :key="feature"
+                      variant="outline"
+                      class="text-[11px] font-medium uppercase tracking-wide"
+                    >
+                      {{ feature }}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="flex flex-wrap items-center justify-between gap-4 pb-3">
+          <div>
+            <CardTitle class="text-lg font-semibold">Your numbers</CardTitle>
+            <CardDescription>
+              Track statuses, capabilities, and jump into detailed configuration.
+            </CardDescription>
+          </div>
+          <Badge variant="outline" class="text-xs font-medium uppercase tracking-wide">
+            {{ totalNumbersCount }} owned
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <div
+            v-if="!userNumbers.length"
+            class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border bg-muted/40 px-8 py-16 text-center"
+          >
+            <Phone class="h-10 w-10 text-muted-foreground" />
+            <div class="space-y-1">
+              <h3 class="text-lg font-semibold">No phone numbers yet.</h3>
+              <p class="text-sm text-muted-foreground">
+                Purchase a number to begin routing calls and messages through the platform.
+              </p>
+            </div>
+            <Link
+              :href="route('phone-numbers.purchase-page')"
+              class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+            >
+              <ShoppingCart class="h-4 w-4" />
+              Purchase Number
+            </Link>
+          </div>
+
+          <div v-else class="overflow-hidden rounded-lg border">
+            <table class="w-full text-sm">
+              <thead class="bg-muted/80 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th class="px-4 py-3 text-left font-medium">Number</th>
+                  <th class="px-4 py-3 text-left font-medium">Capabilities</th>
+                  <th class="px-4 py-3 text-left font-medium">Status</th>
+                  <th class="px-4 py-3 text-left font-medium">Purchased</th>
+                  <th class="px-4 py-3 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="number in userNumbers"
+                  :key="number.id"
+                  class="border-t bg-background/80 transition hover:bg-muted/40"
+                >
+                  <td class="px-4 py-4 align-top">
+                    <p class="font-medium text-foreground">
+                      {{ formatPhoneNumber(number.phone_number) }}
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                      {{ number.friendly_name || 'Telnyx Provisioned' }}
+                    </p>
+                  </td>
+                  <td class="px-4 py-4 align-top">
+                    <div class="flex flex-wrap gap-1.5">
+                      <Badge
+                        v-for="capability in capabilityLabels(number.capabilities)"
+                        :key="capability"
+                        variant="outline"
+                        class="text-[11px] font-medium uppercase tracking-wide"
+                      >
+                        {{ capability }}
+                      </Badge>
+                    </div>
+                  </td>
+                  <td class="px-4 py-4 align-top">
+                    <Badge :variant="statusVariant(number.status)" class="capitalize">
+                      {{ number.status || 'unknown' }}
+                    </Badge>
+                  </td>
+                  <td class="px-4 py-4 align-top text-sm text-muted-foreground">
+                    {{ formatDate(number.purchased_at) }}
+                  </td>
+                  <td class="px-4 py-4 align-top">
+                    <div class="flex justify-end gap-2">
+                      <Link
+                        :href="route('phone-numbers.show', number.id)"
+                        class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <Eye class="h-3.5 w-3.5" />
+                        View
+                      </Link>
+                      <Link
+                        :href="route('phone-numbers.edit-recording-settings', number.id)"
+                        class="inline-flex items-center gap-2 rounded-md bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/20"
+                      >
+                        <Mic class="h-3.5 w-3.5" />
+                        Recording
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  </DashboardLayout>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { Head, Link } from '@inertiajs/vue3'
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import { router } from '@inertiajs/vue3'
+import { reactive, ref, computed } from 'vue'
+import { Head, Link, router } from '@inertiajs/vue3'
+import DashboardLayout from '@/Layouts/DashboardLayout.vue'
+import Card from '@/Components/ui/Card.vue'
+import CardHeader from '@/Components/ui/CardHeader.vue'
+import CardTitle from '@/Components/ui/CardTitle.vue'
+import CardDescription from '@/Components/ui/CardDescription.vue'
+import CardContent from '@/Components/ui/CardContent.vue'
+import Button from '@/Components/ui/Button.vue'
+import Input from '@/Components/ui/Input.vue'
+import Label from '@/Components/ui/Label.vue'
+import Badge from '@/Components/ui/Badge.vue'
+import Select from '@/Components/ui/Select.vue'
+import SelectTrigger from '@/Components/ui/SelectTrigger.vue'
+import SelectContent from '@/Components/ui/SelectContent.vue'
+import SelectItem from '@/Components/ui/SelectItem.vue'
+import SelectValue from '@/Components/ui/SelectValue.vue'
+import {
+  Filter,
+  Search,
+  Loader2,
+  ShoppingCart,
+  Settings,
+  Phone,
+  ShieldCheck,
+  PhoneCall,
+  MessageCircle,
+  PlusCircle,
+  Mic,
+  Eye
+} from 'lucide-vue-next'
 import axios from 'axios'
 
 const props = defineProps({
-    userNumbers: Array
+  userNumbers: {
+    type: Array,
+    default: () => []
+  }
 })
 
+const countryOptions = [
+  { value: 'US', label: 'United States' },
+  { value: 'CA', label: 'Canada' },
+  { value: 'GB', label: 'United Kingdom' },
+  { value: 'AU', label: 'Australia' }
+]
+
+const featureOptions = [
+  { value: 'voice', label: 'Voice', icon: PhoneCall },
+  { value: 'sms', label: 'SMS', icon: MessageCircle }
+]
+
 const searchForm = reactive({
-    country_code: 'US',
-    area_code: '',
-    features: ['voice', 'sms'],
-    limit: 20
+  country_code: 'US',
+  area_code: '',
+  features: ['voice', 'sms'],
+  limit: 20
 })
 
 const searchResults = ref([])
 const searching = ref(false)
-const purchasing = ref(false)
 const searched = ref(false)
+const purchasingNumber = ref(null)
+
+const normalizeStringArray = (items) => {
+  if (!items) return []
+
+  return items
+    .map((item) => {
+      if (!item) return null
+      if (typeof item === 'string') return item
+      if (typeof item === 'object') {
+        return item.name || item.code || item.capability || null
+      }
+      return item.toString()
+    })
+    .filter(Boolean)
+    .map((value) => value.toString().toLowerCase())
+}
+
+const hasCapability = (number, capability) =>
+  normalizeStringArray(number?.capabilities).includes(capability)
+
+const capabilityLabels = (capabilities) =>
+  normalizeStringArray(capabilities).map((capability) => capability.toUpperCase())
+
+const totalNumbersCount = computed(() => props.userNumbers.length)
+const assignedNumbersCount = computed(() =>
+  props.userNumbers.filter((number) =>
+    ['assigned', 'purchased', 'active'].includes((number.status || '').toLowerCase())
+  ).length
+)
+const voiceCapableCount = computed(() =>
+  props.userNumbers.filter((number) => hasCapability(number, 'voice')).length
+)
+const smsCapableCount = computed(() =>
+  props.userNumbers.filter((number) => hasCapability(number, 'sms')).length
+)
 
 const searchNumbers = async () => {
-    searching.value = true
-    try {
-        const response = await axios.post(route('phone-numbers.search'), searchForm)
-        
-        if (response.data.success) {
-            searchResults.value = response.data.data
-        } else {
-            alert('Error searching numbers: ' + response.data.error)
-        }
-        searched.value = true
-    } catch (error) {
-        console.error('Search error:', error)
-        if (error.response?.data?.error) {
-            alert('Error searching numbers: ' + error.response.data.error)
-        } else {
-            alert('Error searching numbers. Please try again.')
-        }
-    } finally {
-        searching.value = false
+  searching.value = true
+  try {
+    const payload = {
+      country_code: searchForm.country_code,
+      area_code: searchForm.area_code,
+      features: [...searchForm.features],
+      limit: searchForm.limit
     }
+
+    const response = await axios.post(route('phone-numbers.search'), payload)
+
+    if (response.data.success) {
+      searchResults.value = response.data.data || []
+    } else {
+      alert('Error searching numbers: ' + (response.data.error || 'Unknown error'))
+    }
+
+    searched.value = true
+  } catch (error) {
+    console.error('Search error:', error)
+    const message =
+      error.response?.data?.error || 'Error searching numbers. Please try again.'
+    alert(message)
+  } finally {
+    searching.value = false
+  }
 }
 
 const purchaseNumber = async (number) => {
-    if (!confirm(`Are you sure you want to purchase ${formatPhoneNumber(number.phone_number)}?`)) {
-        return
-    }
+  if (!confirm(`Purchase ${formatPhoneNumber(number.phone_number)}?`)) {
+    return
+  }
 
-    purchasing.value = true
-    try {
-        const response = await axios.post(route('phone-numbers.purchase'), {
-            phone_number: number.phone_number,
-            country_code: searchForm.country_code,
-            features: searchForm.features
-        })
-        
-        if (response.data.success) {
-            alert('Phone number purchased successfully!')
-            router.reload()
-        } else {
-            alert('Error purchasing number: ' + response.data.error)
-        }
-    } catch (error) {
-        console.error('Purchase error:', error)
-        if (error.response?.data?.error) {
-            alert('Error purchasing number: ' + error.response.data.error)
-        } else {
-            alert('Error purchasing number. Please try again.')
-        }
-    } finally {
-        purchasing.value = false
+  purchasingNumber.value = number.phone_number
+  try {
+    const response = await axios.post(route('phone-numbers.purchase'), {
+      phone_number: number.phone_number,
+      country_code: searchForm.country_code,
+      features: [...searchForm.features]
+    })
+
+    if (response.data.success) {
+      alert('Phone number purchased successfully!')
+      router.reload()
+    } else {
+      alert('Error purchasing number: ' + (response.data.error || 'Unknown error'))
     }
+  } catch (error) {
+    console.error('Purchase error:', error)
+    const message =
+      error.response?.data?.error || 'Error purchasing number. Please try again.'
+    alert(message)
+  } finally {
+    purchasingNumber.value = null
+  }
+}
+
+const clearSearch = () => {
+  searchForm.country_code = 'US'
+  searchForm.area_code = ''
+  searchForm.features = ['voice', 'sms']
+  searchResults.value = []
+  searched.value = false
+}
+
+const isFeatureSelected = (value) => searchForm.features.includes(value)
+
+const toggleFeature = (value) => {
+  const index = searchForm.features.indexOf(value)
+  if (index > -1) {
+    searchForm.features.splice(index, 1)
+  } else {
+    searchForm.features.push(value)
+  }
+}
+
+const getFeatureNames = (features) =>
+  normalizeStringArray(features).map((feature) => feature.toUpperCase())
+
+const formatCurrency = (value) => {
+  if (value == null || Number.isNaN(Number(value))) {
+    return '—'
+  }
+
+  return `$${Number(value).toFixed(2)}`
 }
 
 const formatPhoneNumber = (number) => {
+  if (!number) return 'Unknown'
+  const digits = number.replace(/\D/g, '')
+
+  if (digits.length === 11) {
     return number.replace(/(\d{1})(\d{3})(\d{3})(\d{4})/, '+$1 ($2) $3-$4')
+  }
+
+  return number
 }
 
 const formatDate = (date) => {
-    return new Date(date).toLocaleDateString()
+  if (!date) return '—'
+  const parsed = new Date(date)
+  if (Number.isNaN(parsed.getTime())) return '—'
+
+  return parsed.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
 }
 
-const getStatusColor = (status) => {
-    switch (status) {
-        case 'purchased': return 'text-green-600'
-        case 'pending': return 'text-yellow-600'
-        case 'failed': return 'text-red-600'
-        default: return 'text-gray-600'
-    }
+const statusVariant = (status) => {
+  switch ((status || '').toLowerCase()) {
+    case 'purchased':
+    case 'assigned':
+    case 'active':
+      return 'secondary'
+    case 'pending':
+      return 'outline'
+    case 'failed':
+      return 'destructive'
+    default:
+      return 'outline'
+  }
 }
-
-const getStatusBadgeClass = (status) => {
-    switch (status) {
-        case 'purchased': return 'bg-green-100 text-green-800'
-        case 'pending': return 'bg-yellow-100 text-yellow-800'
-        case 'failed': return 'bg-red-100 text-red-800'
-        default: return 'bg-gray-100 text-gray-800'
-    }
-}
-
-const getFeatureNames = (features) => {
-    if (!features || !Array.isArray(features)) return []
-    return features.map(feature => feature.name || feature)
-}
-</script> 
+</script>

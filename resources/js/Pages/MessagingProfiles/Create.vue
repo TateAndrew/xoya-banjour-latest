@@ -1,507 +1,399 @@
-<template>
-    <Head title="Create Messaging Profile" />
-
-    <AuthenticatedLayout>
-        <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Create Messaging Profile
-            </h2>
-        </template>
-
-        <div class="py-12">
-            <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-                <!-- Success Message -->
-                <div v-if="$page.props.flash?.success" class="mb-6 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md">
-                    {{ $page.props.flash.success }}
-                </div>
-
-                <!-- Error Message -->
-                <div v-if="$page.props.flash?.error || $page.props.errors?.error" class="mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md">
-                    <div class="font-semibold">Error:</div>
-                    <div>{{ $page.props.flash.error || $page.props.errors.error }}</div>
-                </div>
-
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6">
-                        <form @submit.prevent="submit">
-                            <!-- Basic Information -->
-                            <div class="mb-8">
-                                <h3 class="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            Profile Name <span class="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            v-model="form.name"
-                                            type="text"
-                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="Enter profile name"
-                                            required
-                                        />
-                                        <div v-if="errors.name" class="text-red-500 text-sm mt-1">{{ errors.name }}</div>
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            Status
-                                        </label>
-                                        <select
-                                            v-model="form.enabled"
-                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                        >
-                                            <option :value="true">Enabled</option>
-                                            <option :value="false">Disabled</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Whitelisted Destinations -->
-                            <div class="mb-8">
-                                <h3 class="text-lg font-medium text-gray-900 mb-4">Whitelisted Destinations</h3>
-                                
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                                        Allowed Countries <span class="text-red-500">*</span>
-                                    </label>
-                                    <div class="space-y-2">
-                                        <div class="flex items-center">
-                                            <input
-                                                v-model="allowAllCountries"
-                                                type="checkbox"
-                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                                @change="toggleAllCountries"
-                                            />
-                                            <label class="ml-2 text-sm text-gray-700">Allow all countries</label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div v-if="!allowAllCountries" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-4">
-                                    <div v-for="country in countries.filter(c => c.code !== '*')" :key="country.code" class="flex items-center">
-                                        <input
-                                            v-model="form.whitelisted_destinations"
-                                            :value="country.code"
-                                            type="checkbox"
-                                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                        />
-                                        <label class="ml-2 text-sm text-gray-700">{{ country.name }}</label>
-                                    </div>
-                                </div>
-                                
-                                <div v-if="errors.whitelisted_destinations" class="text-red-500 text-sm mt-1">{{ errors.whitelisted_destinations }}</div>
-                            </div>
-
-                            <!-- Webhook Configuration -->
-                            <div class="mb-8">
-                                <h3 class="text-lg font-medium text-gray-900 mb-4">Webhook Configuration</h3>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            Webhook URL
-                                        </label>
-                                        <input
-                                            v-model="form.webhook_url"
-                                            type="url"
-                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="https://your-domain.com/webhook"
-                                        />
-                                        <div v-if="errors.webhook_url" class="text-red-500 text-sm mt-1">{{ errors.webhook_url }}</div>
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            Webhook Failover URL
-                                        </label>
-                                        <input
-                                            v-model="form.webhook_failover_url"
-                                            type="url"
-                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="https://your-domain.com/webhook-failover"
-                                        />
-                                        <div v-if="errors.webhook_failover_url" class="text-red-500 text-sm mt-1">{{ errors.webhook_failover_url }}</div>
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            Webhook API Version
-                                        </label>
-                                        <select
-                                            v-model="form.webhook_api_version"
-                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                        >
-                                            <option value="1">Version 1</option>
-                                            <option value="2">Version 2</option>
-                                            <option value="2010-04-01">Version 2010-04-01</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Number Pool Settings -->
-                            <div class="mb-8">
-                                <h3 class="text-lg font-medium text-gray-900 mb-4">Number Pool Settings</h3>
-                                
-                                <div class="mb-4">
-                                    <div class="flex items-center">
-                                        <input
-                                            v-model="enableNumberPool"
-                                            type="checkbox"
-                                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                            @change="toggleNumberPool"
-                                        />
-                                        <label class="ml-2 text-sm text-gray-700">Enable number pool distribution</label>
-                                    </div>
-                                    <p class="text-sm text-gray-500 mt-1">Configure how messages are distributed across assigned numbers</p>
-                                </div>
-
-                                <div v-if="enableNumberPool" class="space-y-4 pl-6 border-l-2 border-gray-200">
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                Toll-Free Weight <span class="text-red-500">*</span>
-                                            </label>
-                                            <input
-                                                v-model.number="form.number_pool_settings.toll_free_weight"
-                                                type="number"
-                                                min="0"
-                                                step="0.1"
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                                placeholder="1"
-                                                required
-                                            />
-                                            <p class="text-sm text-gray-500 mt-1">Numeric value, minimum 0 (required)</p>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                Long Code Weight <span class="text-red-500">*</span>
-                                            </label>
-                                            <input
-                                                v-model.number="form.number_pool_settings.long_code_weight"
-                                                type="number"
-                                                min="0"
-                                                step="0.1"
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                                placeholder="1"
-                                                required
-                                            />
-                                            <p class="text-sm text-gray-500 mt-1">Numeric value, minimum 0 (required)</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="space-y-3">
-                                        <div class="flex items-center">
-                                            <input
-                                                v-model="form.number_pool_settings.skip_unhealthy"
-                                                type="checkbox"
-                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                            />
-                                            <label class="ml-2 text-sm text-gray-700">Skip unhealthy numbers</label>
-                                        </div>
-                                        <div class="flex items-center">
-                                            <input
-                                                v-model="form.number_pool_settings.sticky_sender"
-                                                type="checkbox"
-                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                            />
-                                            <label class="ml-2 text-sm text-gray-700">Maintain same sender per recipient</label>
-                                        </div>
-                                        <div class="flex items-center">
-                                            <input
-                                                v-model="form.number_pool_settings.geomatch"
-                                                type="checkbox"
-                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                            />
-                                            <label class="ml-2 text-sm text-gray-700">Match recipient's area code (NANP only)</label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- URL Shortener Settings -->
-                            <div class="mb-8">
-                                <h3 class="text-lg font-medium text-gray-900 mb-4">URL Shortener Settings</h3>
-                                
-                                <div class="mb-4">
-                                    <div class="flex items-center">
-                                        <input
-                                            v-model="enableUrlShortener"
-                                            type="checkbox"
-                                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                            @change="toggleUrlShortener"
-                                        />
-                                        <label class="ml-2 text-sm text-gray-700">Enable URL shortener</label>
-                                    </div>
-                                    <p class="text-sm text-gray-500 mt-1">Replace public shortener URLs with Telnyx branded short links</p>
-                                </div>
-
-                                <div v-if="enableUrlShortener" class="space-y-4 pl-6 border-l-2 border-gray-200">
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                Domain <span class="text-red-500">*</span>
-                                            </label>
-                                            <input
-                                                v-model="form.url_shortener_settings.domain"
-                                                type="text"
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                                placeholder="Domain provided by Telnyx"
-                                                required
-                                            />
-                                            <p class="text-sm text-gray-500 mt-1">Required when URL shortener is enabled</p>
-                                        </div>
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                                Brand Prefix
-                                            </label>
-                                            <input
-                                                v-model="form.url_shortener_settings.prefix"
-                                                type="text"
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                                placeholder="Optional brand prefix"
-                                            />
-                                            <p class="text-sm text-gray-500 mt-1">Optional string (nullable)</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="space-y-3">
-                                        <div class="flex items-center">
-                                            <input
-                                                v-model="form.url_shortener_settings.replace_blacklist_only"
-                                                type="checkbox"
-                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                            />
-                                            <label class="ml-2 text-sm text-gray-700">Replace only blacklisted shortener URLs</label>
-                                        </div>
-                                        <div class="flex items-center">
-                                            <input
-                                                v-model="form.url_shortener_settings.send_webhooks"
-                                                type="checkbox"
-                                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                            />
-                                            <label class="ml-2 text-sm text-gray-700">Enable click-tracking webhooks</label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Advanced Settings -->
-                            <div class="mb-8">
-                                <h3 class="text-lg font-medium text-gray-900 mb-4">Advanced Settings</h3>
-                                
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            Alpha Sender
-                                        </label>
-                                        <input
-                                            v-model="form.alpha_sender"
-                                            type="text"
-                                            maxlength="11"
-                                            pattern="^[A-Za-z0-9 ]{1,11}$"
-                                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                            placeholder="MYSENDER"
-                                        />
-                                        <p class="text-sm text-gray-500 mt-1">1-11 alphanumeric characters and spaces only (regex: ^[A-Za-z0-9 ]{1,11}$)</p>
-                                        <div v-if="errors.alpha_sender" class="text-red-500 text-sm mt-1">{{ errors.alpha_sender }}</div>
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                                            Daily Spend Limit (USD)
-                                        </label>
-                                        
-                                        <div class="mb-3">
-                                            <div class="flex items-center">
-                                                <input
-                                                    v-model="form.daily_spend_limit_enabled"
-                                                    type="checkbox"
-                                                    class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                                />
-                                                <label class="ml-2 text-sm text-gray-700">Enable daily spend limit</label>
-                                            </div>
-                                            <p class="text-sm text-gray-500 mt-1">Set a maximum USD amount that can be spent per day</p>
-                                        </div>
-
-                                        <div v-if="form.daily_spend_limit_enabled">
-                                            <input
-                                                v-model="form.daily_spend_limit"
-                                                type="text"
-                                                pattern="^[0-9]+(?:\.[0-9]+)?$"
-                                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                                placeholder="100.00"
-                                                required
-                                            />
-                                            <p class="text-sm text-gray-500 mt-1">Format: numbers and decimal only (regex: ^[0-9]+(?:\.[0-9]+)?$)</p>
-                                            <div v-if="errors.daily_spend_limit" class="text-red-500 text-sm mt-1">{{ errors.daily_spend_limit }}</div>
-                                        </div>
-
-                                        <div v-else class="text-sm text-gray-500 italic">
-                                            Daily spend limit is disabled - no spending restrictions will apply
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- MMS Settings -->
-                            <div class="mb-8">
-                                <h3 class="text-lg font-medium text-gray-900 mb-4">MMS Settings</h3>
-                                
-                                <div class="space-y-4">
-                                    <div class="flex items-center">
-                                        <input
-                                            v-model="form.mms_fall_back_to_sms"
-                                            type="checkbox"
-                                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                        />
-                                        <label class="ml-2 text-sm text-gray-700">Fall back to SMS if MMS fails</label>
-                                    </div>
-
-                                    <div class="flex items-center">
-                                        <input
-                                            v-model="form.mms_transcoding"
-                                            type="checkbox"
-                                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                                        />
-                                        <label class="ml-2 text-sm text-gray-700">Enable MMS media transcoding/resizing</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Form Actions -->
-                            <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-                                <Link
-                                    :href="route('messaging-profiles.index')"
-                                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 border border-gray-300 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                                >
-                                    Cancel
-                                </Link>
-                                <button
-                                    type="submit"
-                                    :disabled="processing"
-                                    class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                                >
-                                    {{ processing ? 'Creating...' : 'Create Profile' }}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Toast Notifications -->
-        <Toast 
-            v-if="toast.show" 
-            :message="toast.message" 
-            :type="toast.type" 
-            :duration="3000"
-        />
-    </AuthenticatedLayout>
-</template>
-
 <script setup>
-import { ref, reactive } from 'vue'
-import { Head, Link, router } from '@inertiajs/vue3'
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import Toast from '@/Components/Toast.vue'
+import { ref, watch, computed } from 'vue'
+import { Head, Link, useForm } from '@inertiajs/vue3'
+import DashboardLayout from '@/Layouts/DashboardLayout.vue'
+import Card from '@/Components/ui/Card.vue'
+import CardHeader from '@/Components/ui/CardHeader.vue'
+import CardTitle from '@/Components/ui/CardTitle.vue'
+import CardDescription from '@/Components/ui/CardDescription.vue'
+import CardContent from '@/Components/ui/CardContent.vue'
+import Button from '@/Components/ui/Button.vue'
+import Input from '@/Components/ui/Input.vue'
+import Label from '@/Components/ui/Label.vue'
+import Switch from '@/Components/ui/Switch.vue'
+import Select from '@/Components/ui/Select.vue'
+import SelectTrigger from '@/Components/ui/SelectTrigger.vue'
+import SelectContent from '@/Components/ui/SelectContent.vue'
+import SelectItem from '@/Components/ui/SelectItem.vue'
+import SelectValue from '@/Components/ui/SelectValue.vue'
+import Separator from '@/Components/ui/Separator.vue'
 
 const props = defineProps({
-    countries: Array,
-    errors: Object,
-    defaultWebhookUrl: String
+  countries: {
+    type: Array,
+    default: () => []
+  },
+  defaultWebhookUrl: {
+    type: String,
+    default: ''
+  }
 })
 
-const form = reactive({
-    name: '',
-    whitelisted_destinations: [],
-    enabled: true,
-    webhook_url: props.defaultWebhookUrl || '',
-    webhook_failover_url: '',
-    webhook_api_version: '2',
-    number_pool_settings: null,
-    url_shortener_settings: null,
-    alpha_sender: '',
-    daily_spend_limit: '',
-    daily_spend_limit_enabled: false,
-    mms_fall_back_to_sms: false,
-    mms_transcoding: false,
+const form = useForm({
+  name: '',
+  enabled: true,
+  whitelisted_destinations: [],
+  webhook_url: props.defaultWebhookUrl || '',
+  webhook_failover_url: '',
+  webhook_api_version: '2',
+  number_pool_settings: null,
+  url_shortener_settings: null,
+  alpha_sender: '',
+  daily_spend_limit: '',
+  daily_spend_limit_enabled: false,
+  mms_fall_back_to_sms: false,
+  mms_transcoding: false
 })
 
-const processing = ref(false)
 const allowAllCountries = ref(false)
 const enableNumberPool = ref(false)
 const enableUrlShortener = ref(false)
-const toast = ref({
-    show: false,
-    message: '',
-    type: 'info'
+
+const nonWildcardCountries = computed(() =>
+  props.countries.filter((country) => country.code !== '*')
+)
+
+watch(allowAllCountries, (value) => {
+  form.whitelisted_destinations = value ? ['*'] : []
 })
 
-const showToast = (message, type = 'info') => {
-    toast.value = {
-        show: true,
-        message,
-        type
-    }
-}
+watch(enableNumberPool, (value) => {
+  form.number_pool_settings = value
+    ? {
+        toll_free_weight: 1,
+        long_code_weight: 1,
+        skip_unhealthy: true,
+        sticky_sender: false,
+        geomatch: false
+      }
+    : null
+})
 
-const toggleAllCountries = () => {
-    if (allowAllCountries.value) {
-        form.whitelisted_destinations = ['*']
-    } else {
-        form.whitelisted_destinations = []
-    }
-}
+watch(enableUrlShortener, (value) => {
+  form.url_shortener_settings = value
+    ? {
+        domain: '',
+        prefix: '',
+        replace_blacklist_only: false,
+        send_webhooks: false
+      }
+    : null
+})
 
-const toggleNumberPool = () => {
-    if (enableNumberPool.value) {
-        form.number_pool_settings = {
-            toll_free_weight: 1,
-            long_code_weight: 1,
-            skip_unhealthy: true,
-            sticky_sender: false,
-            geomatch: false
-        }
-    } else {
-        form.number_pool_settings = null
-    }
-}
-
-const toggleUrlShortener = () => {
-    if (enableUrlShortener.value) {
-        form.url_shortener_settings = {
-            domain: '',
-            prefix: '',
-            replace_blacklist_only: false,
-            send_webhooks: false
-        }
-    } else {
-        form.url_shortener_settings = null
-    }
+const toggleDestination = (code) => {
+  if (form.whitelisted_destinations.includes(code)) {
+    form.whitelisted_destinations = form.whitelisted_destinations.filter((item) => item !== code)
+  } else {
+    form.whitelisted_destinations = [...form.whitelisted_destinations, code]
+  }
 }
 
 const submit = () => {
-    processing.value = true
-    
-    // Ensure we have at least one destination
-    if (form.whitelisted_destinations.length === 0) {
-        form.whitelisted_destinations = ['*']
-        allowAllCountries.value = true
-    }
-    
-    router.post(route('messaging-profiles.store'), form, {
-        onFinish: () => {
-            processing.value = false
-        },
-        onError: (errors) => {
-            console.error('Form errors:', errors)
-            showToast('Please fix the errors below', 'error')
-        }
-    })
+  if (!allowAllCountries.value && form.whitelisted_destinations.length === 0) {
+    alert('Select at least one destination or allow all countries.')
+    return
+  }
+
+  form.post(route('messaging-profiles.store'))
 }
 </script>
+
+<template>
+  <DashboardLayout>
+    <Head title="Create Messaging Profile" />
+
+    <template #header>
+      <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 class="text-3xl font-bold tracking-tight">Create Messaging Profile</h1>
+          <p class="text-sm text-muted-foreground">
+            Configure destinations, webhooks, and routing preferences for outbound messaging.
+          </p>
+        </div>
+        <Link
+          :href="route('messaging-profiles.index')"
+          class="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
+        >
+          ← Back to Profiles
+        </Link>
+      </div>
+    </template>
+
+    <form class="space-y-6 pb-12" @submit.prevent="submit">
+      <div class="grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <Card class="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Profile Details</CardTitle>
+            <CardDescription>Core information and feature flags.</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-6">
+            <div class="space-y-2">
+              <Label>Profile Name</Label>
+              <Input v-model="form.name" placeholder="Marketing Campaign Profile" required />
+              <p v-if="form.errors.name" class="text-xs text-destructive">{{ form.errors.name }}</p>
+            </div>
+
+            <div class="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-4">
+              <div>
+                <p class="text-sm font-medium text-foreground">Status</p>
+                <p class="text-xs text-muted-foreground">Enable to immediately allow traffic.</p>
+              </div>
+              <Switch v-model:checked="form.enabled" />
+            </div>
+
+            <div class="space-y-2">
+              <Label>Alpha Sender (optional)</Label>
+              <Input v-model="form.alpha_sender" maxlength="11" placeholder="MYSENDER" />
+              <p class="text-xs text-muted-foreground">
+                1-11 alphanumeric characters; shown as sender where supported.
+              </p>
+            </div>
+
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <Label>Daily Spend Limit (USD)</Label>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-muted-foreground">Enable</span>
+                  <Switch v-model:checked="form.daily_spend_limit_enabled" />
+                </div>
+              </div>
+              <Input
+                v-model="form.daily_spend_limit"
+                :disabled="!form.daily_spend_limit_enabled"
+                placeholder="100.00"
+                inputmode="decimal"
+              />
+              <p v-if="form.errors.daily_spend_limit" class="text-xs text-destructive">
+                {{ form.errors.daily_spend_limit }}
+              </p>
+            </div>
+
+            <div class="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-4">
+              <div>
+                <p class="text-sm font-medium text-foreground">MMS fallback to SMS</p>
+                <p class="text-xs text-muted-foreground">
+                  Retry as SMS if MMS delivery fails.
+                </p>
+              </div>
+              <Switch v-model:checked="form.mms_fall_back_to_sms" />
+            </div>
+
+            <div class="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-4">
+              <div>
+                <p class="text-sm font-medium text-foreground">MMS transcoding</p>
+                <p class="text-xs text-muted-foreground">
+                  Resize or reformat MMS attachments automatically.
+                </p>
+              </div>
+              <Switch v-model:checked="form.mms_transcoding" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card class="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Destinations</CardTitle>
+            <CardDescription>Control where outbound traffic is permitted.</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <div class="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-4">
+              <div>
+                <p class="text-sm font-medium text-foreground">Allow all countries</p>
+                <p class="text-xs text-muted-foreground">
+                  Overrides individual country selections below.
+                </p>
+              </div>
+              <Switch v-model:checked="allowAllCountries" />
+            </div>
+
+            <div
+              v-if="!allowAllCountries"
+              class="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto rounded-lg border border-border/60 bg-muted/30 p-3 text-xs"
+            >
+              <button
+                v-for="country in nonWildcardCountries"
+                :key="country.code"
+                type="button"
+                class="rounded-md border px-2 py-1 text-left transition"
+                :class="form.whitelisted_destinations.includes(country.code)
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border bg-background text-foreground hover:bg-muted'"
+                @click="toggleDestination(country.code)"
+              >
+                {{ country.name }} ({{ country.code }})
+              </button>
+            </div>
+
+            <p v-if="form.errors.whitelisted_destinations" class="text-xs text-destructive">
+              {{ form.errors.whitelisted_destinations }}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Webhook configuration</CardTitle>
+          <CardDescription>
+            Provide delivery callback URLs for message status updates.
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="grid gap-6 md:grid-cols-2">
+          <div class="space-y-2">
+            <Label>Webhook URL</Label>
+            <Input
+              v-model="form.webhook_url"
+              placeholder="https://example.com/webhooks/messaging"
+              type="url"
+            />
+            <p v-if="form.errors.webhook_url" class="text-xs text-destructive">
+              {{ form.errors.webhook_url }}
+            </p>
+          </div>
+          <div class="space-y-2">
+            <Label>Failover URL</Label>
+            <Input
+              v-model="form.webhook_failover_url"
+              placeholder="https://backup.example.com/webhooks/messaging"
+              type="url"
+            />
+            <p v-if="form.errors.webhook_failover_url" class="text-xs text-destructive">
+              {{ form.errors.webhook_failover_url }}
+            </p>
+          </div>
+          <div class="space-y-2">
+            <Label>API version</Label>
+            <Select v-model="form.webhook_api_version">
+              <SelectTrigger>
+                <SelectValue placeholder="Select version" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Version 1</SelectItem>
+                <SelectItem value="2">Version 2</SelectItem>
+                <SelectItem value="2010-04-01">Version 2010-04-01</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div class="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Number pool</CardTitle>
+            <CardDescription>Evenly distribute messaging volume across numbers.</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <div class="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-4">
+              <div>
+                <p class="text-sm font-medium text-foreground">Enable number pool</p>
+                <p class="text-xs text-muted-foreground">
+                  Toggle weighted distribution and sticky sender features.
+                </p>
+              </div>
+              <Switch v-model:checked="enableNumberPool" />
+            </div>
+
+            <div v-if="enableNumberPool" class="space-y-4">
+              <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-2">
+                  <Label>Toll-free weight</Label>
+                  <Input
+                    v-model.number="form.number_pool_settings.toll_free_weight"
+                    min="0"
+                    step="0.1"
+                    type="number"
+                  />
+                </div>
+                <div class="space-y-2">
+                  <Label>Long code weight</Label>
+                  <Input
+                    v-model.number="form.number_pool_settings.long_code_weight"
+                    min="0"
+                    step="0.1"
+                    type="number"
+                  />
+                </div>
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between rounded-md border border-border/60 bg-muted/40 p-3">
+                  <div>
+                    <p class="text-xs font-medium text-foreground">Skip unhealthy numbers</p>
+                  </div>
+                  <Switch v-model:checked="form.number_pool_settings.skip_unhealthy" />
+                </div>
+                <div class="flex items-center justify-between rounded-md border border-border/60 bg-muted/40 p-3">
+                  <div>
+                    <p class="text-xs font-medium text-foreground">Sticky sender</p>
+                    <p class="text-[11px] text-muted-foreground">
+                      Keep the same sender per recipient for consistency.
+                    </p>
+                  </div>
+                  <Switch v-model:checked="form.number_pool_settings.sticky_sender" />
+                </div>
+                <div class="flex items-center justify-between rounded-md border border-border/60 bg-muted/40 p-3">
+                  <div>
+                    <p class="text-xs font-medium text-foreground">Geomatch</p>
+                    <p class="text-[11px] text-muted-foreground">
+                      Match recipients to local area codes (NANP only).
+                    </p>
+                  </div>
+                  <Switch v-model:checked="form.number_pool_settings.geomatch" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>URL shortener</CardTitle>
+            <CardDescription>Rewrite tracked links with Telnyx branded URLs.</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <div class="flex items-center justify-between rounded-lg border border-border/60 bg-muted/30 p-4">
+              <div>
+                <p class="text-sm font-medium text-foreground">Enable URL shortener</p>
+                <p class="text-xs text-muted-foreground">
+                  Replace commonly blocked public shorteners automatically.
+                </p>
+              </div>
+              <Switch v-model:checked="enableUrlShortener" />
+            </div>
+
+            <div v-if="enableUrlShortener" class="space-y-4">
+              <div class="space-y-2">
+                <Label>Domain</Label>
+                <Input v-model="form.url_shortener_settings.domain" placeholder="short.telnyx.com" />
+              </div>
+              <div class="space-y-2">
+                <Label>Brand prefix (optional)</Label>
+                <Input v-model="form.url_shortener_settings.prefix" placeholder="BRAND" />
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between rounded-md border border-border/60 bg-muted/40 p-3">
+                  <span class="text-xs font-medium text-foreground">Replace blacklist only</span>
+                  <Switch v-model:checked="form.url_shortener_settings.replace_blacklist_only" />
+                </div>
+                <div class="flex items-center justify-between rounded-md border border-border/60 bg-muted/40 p-3">
+                  <span class="text-xs font-medium text-foreground">Send webhooks</span>
+                  <Switch v-model:checked="form.url_shortener_settings.send_webhooks" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Separator />
+
+      <div class="flex justify-end gap-2">
+        <Button type="button" variant="ghost" @click="window.history.back()">Cancel</Button>
+        <Button type="submit" :disabled="form.processing">
+          {{ form.processing ? 'Creating…' : 'Create Profile' }}
+        </Button>
+      </div>
+    </form>
+  </DashboardLayout>
+</template>
 

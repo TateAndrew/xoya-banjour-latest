@@ -1,225 +1,287 @@
-<template>
-    <Head title="Messaging Profiles" />
-
-    <AuthenticatedLayout>
-        <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Messaging Profiles
-            </h2>
-        </template>
-
-        <div class="py-12">
-            <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                <!-- Success Message -->
-                <div v-if="$page.props.flash?.success" class="mb-6 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md">
-                    {{ $page.props.flash.success }}
-                </div>
-
-                <!-- Error Message -->
-                <div v-if="$page.props.flash?.error || $page.props.errors?.error" class="mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md">
-                    {{ $page.props.flash.error || $page.props.errors.error }}
-                </div>
-
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6 text-gray-900">
-                        <div class="flex justify-between items-center mb-6">
-                            <h1 class="text-2xl font-semibold text-gray-900">Messaging Profiles</h1>
-                            <Link
-                                :href="route('messaging-profiles.create')"
-                                class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
-                            >
-                                Create New Profile
-                            </Link>
-                        </div>
-
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Name
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Destinations
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Webhook
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Created
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    <tr v-for="profile in messagingProfiles.data" :key="profile.id" class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900">
-                                                {{ profile.name }}
-                                            </div>
-                                            <div class="text-sm text-gray-500">
-                                                ID: {{ profile.telnyx_profile_id }}
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <span
-                                                :class="{
-                                                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800': profile.enabled,
-                                                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800': !profile.enabled
-                                                }"
-                                            >
-                                                {{ profile.enabled ? 'Enabled' : 'Disabled' }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <div class="max-w-xs">
-                                                <span v-if="profile.whitelisted_destinations.includes('*')" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                    All Countries
-                                                </span>
-                                                <span v-else class="text-xs text-gray-600">
-                                                    {{ profile.whitelisted_destinations.join(', ') }}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            <span v-if="profile.webhook_url" class="text-green-600">✓ Configured</span>
-                                            <span v-else class="text-gray-400">Not set</span>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ new Date(profile.created_at).toLocaleDateString() }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <div class="flex space-x-2">
-                                                <Link
-                                                    :href="route('messaging-profiles.show', profile.id)"
-                                                    class="text-blue-600 hover:text-blue-900"
-                                                >
-                                                    View
-                                                </Link>
-                                                <Link
-                                                    :href="route('messaging-profiles.edit', profile.id)"
-                                                    class="text-indigo-600 hover:text-indigo-900"
-                                                >
-                                                    Edit
-                                                </Link>
-                                                <button
-                                                    @click="deleteProfile(profile.id)"
-                                                    class="text-red-600 hover:text-red-900"
-                                                >
-                                                    Delete
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Pagination -->
-                        <div v-if="messagingProfiles.links && messagingProfiles.links.length > 3" class="mt-6">
-                            <nav class="flex justify-center">
-                                <div class="flex space-x-1">
-                                    <Link
-                                        v-for="(link, index) in messagingProfiles.links"
-                                        :key="index"
-                                        :href="link.url"
-                                        :class="{
-                                            'px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50': !link.url,
-                                            'px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50': link.url && !link.active,
-                                            'px-3 py-2 text-sm font-medium text-white bg-indigo-600 border border-indigo-600 rounded-md': link.active
-                                        }"
-                                        v-html="link.label"
-                                    ></Link>
-                                </div>
-                            </nav>
-                        </div>
-
-                        <!-- Empty State -->
-                        <div v-if="messagingProfiles.data.length === 0" class="text-center py-12">
-                            <div class="text-gray-500">
-                                <div class="mx-auto h-12 w-12 text-gray-400 mb-4">
-                                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="w-12 h-12">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                    </svg>
-                                </div>
-                                <p class="text-lg font-medium">No messaging profiles found</p>
-                                <p class="mt-2">Get started by creating your first messaging profile.</p>
-                                <div class="mt-6">
-                                    <Link
-                                        :href="route('messaging-profiles.create')"
-                                        class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
-                                    >
-                                        Create Messaging Profile
-                                    </Link>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Toast Notifications -->
-        <Toast 
-            v-if="toast.show" 
-            :message="toast.message" 
-            :type="toast.type" 
-            :duration="3000"
-        />
-    </AuthenticatedLayout>
-</template>
-
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import Toast from '@/Components/Toast.vue'
+import axios from 'axios'
+import DashboardLayout from '@/Layouts/DashboardLayout.vue'
+import Card from '@/Components/ui/Card.vue'
+import CardHeader from '@/Components/ui/CardHeader.vue'
+import CardTitle from '@/Components/ui/CardTitle.vue'
+import CardDescription from '@/Components/ui/CardDescription.vue'
+import CardContent from '@/Components/ui/CardContent.vue'
+import Button from '@/Components/ui/Button.vue'
+import Badge from '@/Components/ui/Badge.vue'
+import {
+  MessageSquare,
+  ShieldCheck,
+  Globe2,
+  Activity,
+  RefreshCw,
+  LinkIcon,
+  Trash2,
+  PlusCircle
+} from 'lucide-vue-next'
 
 const props = defineProps({
-    messagingProfiles: Object
+  messagingProfiles: {
+    type: Object,
+    required: true
+  }
 })
 
-const toast = ref({
-    show: false,
-    message: '',
-    type: 'info'
-})
+const deletingId = ref(null)
 
-const showToast = (message, type = 'info') => {
-    toast.value = {
-        show: true,
-        message,
-        type
-    }
+const profiles = computed(() => props.messagingProfiles?.data || [])
+const totalProfiles = computed(() => profiles.value.length)
+const enabledProfiles = computed(() =>
+  profiles.value.filter((profile) => profile.enabled).length
+)
+const webhookProfiles = computed(() =>
+  profiles.value.filter((profile) => !!profile.webhook_url).length
+)
+const globalProfiles = computed(() =>
+  profiles.value.filter((profile) =>
+    Array.isArray(profile.whitelisted_destinations) &&
+    profile.whitelisted_destinations.includes('*')
+  ).length
+)
+
+const formatDate = (date) => {
+  if (!date) return '—'
+  const parsed = new Date(date)
+  if (Number.isNaN(parsed.getTime())) return '—'
+
+  return parsed.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
 }
 
-const deleteProfile = async (profileId) => {
-    if (confirm('Are you sure you want to delete this messaging profile? This action cannot be undone.')) {
-        try {
-            const response = await fetch(`/messaging-profiles/${profileId}`, {
-                method: 'DELETE',
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                    'Accept': 'application/json',
-                }
-            })
-            
-            if (response.ok) {
-                showToast('Messaging profile deleted successfully!', 'success')
-                window.location.reload()
-            } else {
-                const result = await response.json()
-                showToast('Failed to delete messaging profile: ' + (result.message || 'Unknown error'), 'error')
-            }
-        } catch (error) {
-            showToast('Failed to delete messaging profile', 'error')
-        }
-    }
+const deleteProfile = async (profile) => {
+  if (!confirm(`Delete messaging profile "${profile.name}"? This action cannot be undone.`)) {
+    return
+  }
+
+  deletingId.value = profile.id
+  try {
+    await axios.delete(`/messaging-profiles/${profile.id}`)
+    alert('Messaging profile deleted.')
+    window.location.reload()
+  } catch (error) {
+    console.error('Delete error', error)
+    alert('Failed to delete messaging profile. Please try again.')
+  } finally {
+    deletingId.value = null
+  }
 }
+
+const statusVariant = (enabled) => (enabled ? 'secondary' : 'destructive')
 </script>
+
+<template>
+  <DashboardLayout>
+    <Head title="Messaging Profiles" />
+
+    <template #header>
+      <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 class="text-3xl font-bold tracking-tight">Messaging Profiles</h1>
+          <p class="text-sm text-muted-foreground">
+            Manage Telnyx messaging profiles, destinations, and webhook endpoints.
+          </p>
+        </div>
+        <Link
+          :href="route('messaging-profiles.create')"
+          class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+        >
+          <PlusCircle class="h-4 w-4" />
+          New Messaging Profile
+        </Link>
+      </div>
+    </template>
+
+    <div class="space-y-6 pb-12">
+      <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">Total profiles</CardTitle>
+            <MessageSquare class="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-semibold">{{ totalProfiles }}</div>
+            <p class="text-xs text-muted-foreground">Across all messaging use cases</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">Enabled</CardTitle>
+            <ShieldCheck class="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-semibold">{{ enabledProfiles }}</div>
+            <p class="text-xs text-muted-foreground">Ready to send traffic</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">Webhook configured</CardTitle>
+            <LinkIcon class="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-semibold">{{ webhookProfiles }}</div>
+            <p class="text-xs text-muted-foreground">Profiles posting delivery updates</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle class="text-sm font-medium">Global coverage</CardTitle>
+            <Globe2 class="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div class="text-2xl font-semibold">{{ globalProfiles }}</div>
+            <p class="text-xs text-muted-foreground">Whitelisted for all countries</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <CardTitle class="text-lg font-semibold">Profiles</CardTitle>
+            <CardDescription>
+              Review configuration status, webhook endpoints, and destination coverage.
+            </CardDescription>
+          </div>
+          <Button variant="outline" class="gap-2" @click="window.location.reload()">
+            <RefreshCw class="h-4 w-4" />
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div
+            v-if="!profiles.length"
+            class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border bg-muted/40 px-8 py-16 text-center"
+          >
+            <MessageSquare class="h-10 w-10 text-muted-foreground" />
+            <div class="space-y-1">
+              <h3 class="text-lg font-semibold">No messaging profiles yet.</h3>
+              <p class="text-sm text-muted-foreground">
+                Create a profile to map numbers to messaging capabilities and webhooks.
+              </p>
+            </div>
+            <Link
+              :href="route('messaging-profiles.create')"
+              class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+            >
+              <PlusCircle class="h-4 w-4" />
+              Create Messaging Profile
+            </Link>
+          </div>
+
+          <div v-else class="overflow-hidden rounded-lg border">
+            <table class="w-full text-sm">
+              <thead class="bg-muted/80 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th class="px-4 py-3 text-left font-medium">Profile</th>
+                  <th class="px-4 py-3 text-left font-medium">Status</th>
+                  <th class="px-4 py-3 text-left font-medium">Destinations</th>
+                  <th class="px-4 py-3 text-left font-medium">Webhook</th>
+                  <th class="px-4 py-3 text-left font-medium">Created</th>
+                  <th class="px-4 py-3 text-left font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="profile in profiles"
+                  :key="profile.id"
+                  class="border-t bg-background/80 transition hover:bg-muted/40"
+                >
+                  <td class="px-4 py-4 align-top">
+                    <p class="font-medium text-foreground">{{ profile.name }}</p>
+                    <p class="text-xs text-muted-foreground">
+                      Telnyx ID • {{ profile.telnyx_profile_id || 'N/A' }}
+                    </p>
+                  </td>
+                  <td class="px-4 py-4 align-top">
+                    <Badge :variant="statusVariant(profile.enabled)" class="capitalize">
+                      {{ profile.enabled ? 'Enabled' : 'Disabled' }}
+                    </Badge>
+                  </td>
+                  <td class="px-4 py-4 align-top text-xs text-muted-foreground">
+                    <span
+                      v-if="profile.whitelisted_destinations?.includes('*')"
+                      class="inline-flex items-center gap-1 font-medium text-foreground"
+                    >
+                      <Globe2 class="h-3.5 w-3.5" />
+                      All Countries
+                    </span>
+                    <span v-else>
+                      {{ (profile.whitelisted_destinations || []).join(', ') || 'N/A' }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-4 align-top text-xs text-muted-foreground">
+                    <Badge variant="outline">
+                      {{ profile.webhook_url ? 'Configured' : 'Not set' }}
+                    </Badge>
+                  </td>
+                  <td class="px-4 py-4 align-top text-xs text-muted-foreground">
+                    {{ formatDate(profile.created_at) }}
+                  </td>
+                  <td class="px-4 py-4 align-top">
+                    <div class="flex flex-wrap gap-2">
+                      <Link
+                        :href="route('messaging-profiles.show', profile.id)"
+                        class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <Activity class="h-3.5 w-3.5" />
+                        View
+                      </Link>
+                      <Link
+                        :href="route('messaging-profiles.edit', profile.id)"
+                        class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <ShieldCheck class="h-3.5 w-3.5" />
+                        Edit
+                      </Link>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        class="gap-2"
+                        :disabled="deletingId === profile.id"
+                        @click="deleteProfile(profile)"
+                      >
+                        <Loader2 v-if="deletingId === profile.id" class="h-3.5 w-3.5 animate-spin" />
+                        <Trash2 v-else class="h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            v-if="props.messagingProfiles.links && props.messagingProfiles.links.length > 3"
+            class="border-t px-4 py-3"
+          >
+            <div class="flex justify-end gap-2">
+              <Link
+                v-for="(link, index) in props.messagingProfiles.links"
+                :key="index"
+                :href="link.url || '#'"
+                class="rounded-md border border-input px-3 py-1 text-xs font-medium transition hover:bg-accent hover:text-accent-foreground"
+                :class="{ 'bg-primary text-primary-foreground border-primary': link.active }"
+                v-html="link.label"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  </DashboardLayout>
+</template>
 

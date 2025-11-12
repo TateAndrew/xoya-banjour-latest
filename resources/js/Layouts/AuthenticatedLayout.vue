@@ -120,6 +120,13 @@ const showingNavigationDropdown = ref(false);
                                 >
                                     SMS Messenger
                                 </NavLink>
+                                
+                                <NavLink
+                                    :href="route('video-calls.index')"
+                                    :active="route().current('video-calls.*') || route().current('video-call.*')"
+                                >
+                                    Video Calls
+                                </NavLink>
                                
                                 <NavLink
                                     :href="route('users.index')"

@@ -1,26 +1,23 @@
 <template>
-  <AuthenticatedLayout>
+  <DashboardLayout>
     <template #header>
-      <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-        User Management
-      </h2>
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">User Management</h1>
+        <p class="text-muted-foreground">Manage users, roles, and permissions</p>
+      </div>
     </template>
 
-    <div class="py-12">
-      <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-          <div class="p-6 text-gray-900">
-            <!-- Header with Create Button -->
-            <div class="flex justify-between items-center mb-6">
-              <h3 class="text-lg font-medium text-gray-900">Users</h3>
-              <Link
-                :href="route('users.create')"
-                class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 focus:bg-blue-700 active:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition ease-in-out duration-150"
-              >
-                <PlusIcon class="w-4 h-4 mr-2" />
-                Add User
-              </Link>
-            </div>
+    <div class="space-y-6">
+      <!-- Header with Create Button -->
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-lg font-medium">All Users</h3>
+        <Link :href="route('users.create')">
+          <button class="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+            <Plus :size="16" class="mr-2" />
+            Add User
+          </button>
+        </Link>
+      </div>
 
             <!-- Search and Filters -->
             <div class="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -203,18 +200,15 @@
                 </div>
               </nav>
             </div>
-          </div>
-        </div>
-      </div>
     </div>
-  </AuthenticatedLayout>
+  </DashboardLayout>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import { PlusIcon } from '@heroicons/vue/24/outline'
+import DashboardLayout from '@/Layouts/DashboardLayout.vue'
+import { Plus } from 'lucide-vue-next'
 
 const props = defineProps({
   users: Object,

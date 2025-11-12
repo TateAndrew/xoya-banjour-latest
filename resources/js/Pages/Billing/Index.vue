@@ -1,7 +1,7 @@
 <template>
     <Head title="Billing" />
 
-    <AuthenticatedLayout>
+    <DashboardLayout>
         <template #header>
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 Billing & Usage
@@ -214,7 +214,7 @@
                 </div>
             </div>
         </div>
-    </AuthenticatedLayout>
+    </DashboardLayout>
 </template>
 
 <script setup>

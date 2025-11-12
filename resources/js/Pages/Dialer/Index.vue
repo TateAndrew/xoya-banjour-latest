@@ -1,7 +1,7 @@
 <template>
     <Head title="Professional Audio Dialer" />
 
-    <AuthenticatedLayout>
+    <DashboardLayout>
         <template #header>
             <div class="flex items-center justify-between">
                 <h2 class="font-semibold text-xl text-gray-800 leading-tight">
@@ -570,7 +570,7 @@
         <!-- Hidden Audio Elements -->
         <audio id="remoteMedia" autoplay="true" />
         <audio id="localMedia" autoplay="true" muted="true" />
-    </AuthenticatedLayout>
+    </DashboardLayout>
 </template>
 
 <script setup>

@@ -1,9 +1,10 @@
 <template>
-  <AuthenticatedLayout>
+  <DashboardLayout>
     <template #header>
-      <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-        Edit Role: {{ role.name }}
-      </h2>
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">Edit Role: {{ role.name }}</h1>
+        <p class="text-muted-foreground">Update role information and permissions</p>
+      </div>
     </template>
 
     <div class="py-12">
@@ -133,13 +134,13 @@
         </div>
       </div>
     </div>
-  </AuthenticatedLayout>
+  </DashboardLayout>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import DashboardLayout from '@/Layouts/DashboardLayout.vue';
 
 const props = defineProps({
   role: Object,
